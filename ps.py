@@ -62,6 +62,67 @@ def generate_cmb_power_spectra(pars, raw_cl=True):
     return ClTT, ClEE, ClBB, ClTE
 
 
+def TGC_to_TEB(ClTT, ClGG, ClCC, ClTG):
+    """Transform TGC convention to TEB convension"""
+    return ClTT, 2*ClGG, 2*ClCC, np.sqrt(2)*ClTG
+
+
+def TEB_to_TGC(ClTT, ClEE, ClBB, ClTE):
+    """Transform TEB convention to TGC convension"""
+    return ClTT, 0.5*ClEE, 0.5*ClBB, 1.0/np.sqrt(2)*ClTE
+
+    
+def generate_power_spectra_realization(pars, raw_cl=True):
+    """Generate a realization of the power spectra
+
+    Args:
+        pars: CAMB param
+        raw_cl: True if l(l+1)/2\pi prefactor is not included
+
+    Returns:
+        ClTT, ClEE, ClBB, ClTE power spectra
+    """
+    ClTT, ClEE, ClBB, ClTE = generate_cmb_power_spectra(pars, raw_cl=raw_cl)
+
+    # convert into TGC convention for easier calculation
+    ClTT, ClGG, ClCC, ClTG = TEB_to_TGC(ClTT, ClEE, ClBB, ClTE)
+
+    # define empty arrays to hold the generated power spectra
+    lmax = len(ClTT)
+    m_ClTT = np.zeros(lmax)
+    m_ClGG = np.zeros(lmax)
+    m_ClCC = np.zeros(lmax)
+    m_ClTG = np.zeros(lmax)
+
+    # this is certainly slow, but I can use it as a benchmark
+    # to see how much acceleration I can get by changing into
+    # a compiled version. A quick test shows that it takes >5
+    # minutes to run! Note that we start from l=2 because l=0,1
+    # are 0 for convenience
+    for l in range(2, lmax):
+        i_ClTT = 0
+        i_ClGG = 0
+        i_ClCC = 0
+        i_ClTG = 0
+        for m in np.arange(-l, l+1):
+            zeta1 = np.random.normal(0, 1)
+            zeta2 = np.random.normal(0, 1)
+            zeta3 = np.random.normal(0, 1)
+            aTlm = zeta1 * ClTT[l]**0.5
+            aGlm = zeta1 * ClTG[l] / (ClTT[l])**0.5 + zeta2*(ClGG[l] - ClTG[l]**2/ClTT[l])
+            aClm = zeta3 * ClCC[l]**0.5
+            i_ClTT += 1.0 * np.abs(aTlm)**2 / (2*l+1)
+            i_ClGG += 1.0 * np.abs(aGlm)**2 / (2*l+1)
+            i_ClCC += 1.0 * np.abs(aClm)**2 / (2*l+1)
+            i_ClTG += 1.0 * np.conj(aTlm)*aGlm / (2*l+1)
+        m_ClTT[l] = i_ClTT
+        m_ClGG[l] = i_ClGG
+        m_ClCC[l] = i_ClCC
+        m_ClTG[l] = i_ClTG
+
+    return TGC_to_TEB(m_ClTT, m_ClGG, m_ClCC, m_ClTG)
+
+
 def covariance_matrix(pars, n_pixels, sigma_T, theta_fwhm, f_sky=1):
     """Calculate the covariance matrix based on a model.
     
@@ -128,7 +189,7 @@ def covariance_matrix(pars, n_pixels, sigma_T, theta_fwhm, f_sky=1):
     return cov
 
 
-def calculate_fisher_matrix(model, cov, ratio=0.01):
+def fisher_matrix(model, cov, ratio=0.01):
     """Estimate the fisher matrix near the model provided. 
 
     Args: 
@@ -203,3 +264,6 @@ def calculate_fisher_matrix(model, cov, ratio=0.01):
                 alpha[i,j] += np.einsum('i,ij,j', dCldp[i][:,l], np.linalg.inv(cov[l,:,:]), dCldp[j][:,l])
 
     return alpha, params
+
+
+
