@@ -100,21 +100,21 @@ def generate_power_spectra_realization(pars, raw_cl=True):
     # minutes to run! Note that we start from l=2 because l=0,1
     # are 0 for convenience
     for l in range(2, lmax):
-        i_ClTT = 0
-        i_ClGG = 0
-        i_ClCC = 0
-        i_ClTG = 0
-        for m in np.arange(-l, l+1):
-            zeta1 = np.random.normal(0, 1)
-            zeta2 = np.random.normal(0, 1)
-            zeta3 = np.random.normal(0, 1)
-            aTlm = zeta1 * ClTT[l]**0.5
-            aGlm = zeta1 * ClTG[l] / (ClTT[l])**0.5 + zeta2*(ClGG[l] - ClTG[l]**2/ClTT[l])
-            aClm = zeta3 * ClCC[l]**0.5
-            i_ClTT += 1.0 * np.abs(aTlm)**2 / (2*l+1)
-            i_ClGG += 1.0 * np.abs(aGlm)**2 / (2*l+1)
-            i_ClCC += 1.0 * np.abs(aClm)**2 / (2*l+1)
-            i_ClTG += 1.0 * np.conj(aTlm)*aGlm / (2*l+1)
+        # a faster version
+        zeta1 = np.random.normal(0, 1, 2*l+1)*np.exp(1j*np.random.uniform(0, 2*np.pi, 2*l+1))
+        zeta2 = np.random.normal(0, 1, 2*l+1)*np.exp(1j*np.random.uniform(0, 2*np.pi, 2*l+1))
+        zeta3 = np.random.normal(0, 1, 2*l+1)*np.exp(1j*np.random.uniform(0, 2*np.pi, 2*l+1))
+
+        # generate alm
+        aTlm = zeta1 * ClTT[l]**0.5
+        aGlm = zeta1 * ClTG[l] / (ClTT[l])**0.5 + zeta2*(ClGG[l] - ClTG[l]**2/ClTT[l])
+        aClm = zeta3 * ClCC[l]**0.5
+
+        i_ClTT = np.sum(1.0 * np.abs(aTlm)**2 / (2*l+1))
+        i_ClGG = np.sum(1.0 * np.abs(aGlm)**2 / (2*l+1))
+        i_ClCC = np.sum(1.0 * np.abs(aClm)**2 / (2*l+1))
+        i_ClTG = np.sum(1.0 * np.conj(aTlm)*aGlm / (2*l+1))
+
         m_ClTT[l] = i_ClTT
         m_ClGG[l] = i_ClGG
         m_ClCC[l] = i_ClCC
