@@ -123,13 +123,49 @@ def generate_power_spectra_realization(pars, raw_cl=True):
     return TGC_to_TEB(m_ClTT, m_ClGG, m_ClCC, m_ClTG)
 
 
-def covariance_matrix(pars, n_pixels, sigma_T, theta_fwhm, f_sky=1):
-    """Calculate the covariance matrix based on a model.
+def add_noise(ClTT, ClEE, ClBB, ClTE, pixel_noise, theta_fwhm):
+    """ with noises added in to
+    simulate real data
     
     Args:
+        ClTT, ClEE, ClBB, ClTE: power spectra
+        pixel_noise: noise per pixel
+        theta_fwhm: beam size in degress (full width half minimum)
+        f_sky: sky coverage fraction, 1 means full-sky coverage
+
+    Returns:
+        ClTT, ClEE, ClBB, ClTE power spectra
+    """
+    # first convert to the notations consistent with Kamionkowski,
+    # Kosowsky, Stebbins (1997)
+    ClTT, ClGG, ClCC, ClTG = TEB_to_TGC(ClTT, ClEE, ClBB, ClTE)
+
+    sigma_b = 0.00742 * theta_fwhm 
+
+    # assuming the beam is a gaussian beam with an ell dependent
+    # beam size
+    Wb = lambda l: np.exp(-l*(l+1)*sigma_b**2/2)
+
+    # calculate the noise parameter w^-1
+    winv = pixel_noise**2
+
+    ell = np.arange(len(ClTT))
+    
+    ClTT += winv * np.abs(Wb(ell))**-2
+    ClGG += winv * np.abs(Wb(ell))**-2
+    ClCC += winv * np.abs(Wb(ell))**-2
+    # ClTG remain unchanged
+
+    # convert back
+    return TEB_to_TGC(ClTT, ClGG, ClCC, ClTG)
+
+
+def covariance_matrix(pars, pixel_noise, theta_fwhm, f_sky=1):
+    """Calculate the covariance matrix based on a model.
+    22
+    Args:
         pars: cambParams object
-        n_pixels: number of pixels in the telescope
-        sigma_T: mean noise level in the detector in unit of muK
+        pixel_noise: noise per pixel
         theta_fwhm: beam size in degress (full width half minimum)
         f_sky: sky coverage fraction, 1 means full-sky coverage
 
@@ -141,10 +177,10 @@ def covariance_matrix(pars, n_pixels, sigma_T, theta_fwhm, f_sky=1):
 
     # assuming the beam is a gaussian beam with an ell dependent
     # beam size
-    Wb = lambda l: np.exp(-l**2*sigma_b**2/2)
+    Wb = lambda l: np.exp(-l*(l+1)*sigma_b**2/2)
 
     # calculate the noise parameter w^-1
-    winv = 2 * np.pi * sigma_T**2 / n_pixels
+    winv = pixel_noise**2
 
     # calculate the cmb power spectra based on the parameter
     ClTT, ClEE, ClBB, ClTE = generate_cmb_power_spectra(pars, raw_cl=True)
@@ -157,6 +193,7 @@ def covariance_matrix(pars, n_pixels, sigma_T, theta_fwhm, f_sky=1):
     n_ell = len(ClTT)    
     cov = np.zeros([n_ell, 4, 4])
 
+    # TODO: this can be done more efficiently by vectorization
     for l in range(n_ell):
         # T, T 
         cov[l,0,0] = 2.0/(2*l+1)*(ClTT[l] + winv*np.abs(Wb(l))**-2)**2
