@@ -108,8 +108,11 @@ class IniFile(object):
 
 class CambResult(object):
     def __init__(self, stuff):
+        values = []
         for k,v in stuff:
             setattr(self, k, v)
+            values.append(v)
+        self.values = np.vstack(values)
 
 class CambSession:
     def __init__(self, base_ini=None, rank=None,
@@ -230,6 +233,28 @@ class CambSession:
                  ('EE', data[2]),
                  ('TE', data[3])]
         return CambResult(stuff)
+
+    def load_vectorCls(self):
+        mp = self.get_output_filename('vecCls.dat')
+        data = np.loadtxt(mp, unpack=1)
+        stuff = [('ell', data[0]),
+                 ('TT', data[1]),
+                 ('EE', data[2]),
+                 ('BB', data[3]),
+                 ('TE', data[4])]
+        
+        return CambResult(stuff)    
+    
+    def load_tensorCls(self):
+        mp = self.get_output_filename('tensCls.dat')
+        data = np.loadtxt(mp, unpack=1)
+        stuff = [('ell', data[0]),
+                 ('TT', data[1]),
+                 ('EE', data[2]),
+                 ('BB', data[3]),
+                 ('TE', data[4])]
+        
+        return CambResult(stuff)    
 
     def cleanup(self):
         files = glob.glob(self.get_output_filename('*'))
