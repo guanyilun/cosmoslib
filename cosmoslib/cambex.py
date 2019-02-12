@@ -254,7 +254,18 @@ class CambSession:
                  ('BB', data[3]),
                  ('TE', data[4])]
         
-        return CambResult(stuff)    
+        return CambResult(stuff)
+
+    def load_lensedCls(self):
+        mp = self.get_output_filename('lensedCls.dat')
+        data = np.loadtxt(mp, unpack=1)
+        stuff = [('ell', data[0]),
+                 ('TT', data[1]),
+                 ('EE', data[2]),
+                 ('BB', data[3]),
+                 ('TE', data[4])]
+
+        return CambResult(stuff)
 
     def cleanup(self):
         files = glob.glob(self.get_output_filename('*'))
