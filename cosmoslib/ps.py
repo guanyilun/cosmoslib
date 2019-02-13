@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from camb import model, initialpower
 import camb
+import cambex
 
 
 def generate_camb_params(ombh2, omch2, tau, ln10e10As, ns, omk=0,
@@ -303,4 +304,125 @@ def fisher_matrix(model, cov, ratio=0.01):
     return alpha, params
 
 
+def generate_ps(ombh2=0.02225, omch2=0.1198, hubble=67.8):
+    """Generate the total power spectrum from primary and magnetic
+    field contribution"""
 
+    BASE_DIR = "/home/aaron/Workspace/research/MagCAMB/"
+
+    # open a magcamb session
+    magcamb = cambex.CambSession(camb_bin=BASE_DIR+'camb')
+
+    # define base parameters
+    magcamb.set_base_params(BASE_DIR+"custom/params/params_mag.ini")
+
+    # set cosmological parameters
+    magcamb.ini.set("ombh2", ombh2)
+    magcamb.ini.set("omch2", omch2)
+    magcamb.ini.set("hubble", hubble)
+    # more can be set here
+
+    ###################################
+    # passive scalar and tensor modes #
+    ###################################
+
+    # these two modes can be computed together
+    magcamb.ini.set("get_scalar_cls", "T")
+    magcamb.ini.set("get_vector_cls", "F")
+    magcamb.ini.set("get_tensor_cls", "T")
+    magcamb.ini.set("magnetic_mode", "2")
+
+    magcamb.run()
+
+    # collect power spectra
+    passive_scalar = magcamb.load_scalarCls().values.T
+    passive_tensor = magcamb.load_tensorCls().values.T
+
+
+    ###########################
+    # compensated scalar mode #
+    ###########################
+
+    magcamb.ini.set("get_scalar_cls", "T")
+    magcamb.ini.set("get_vector_cls", "F")
+    magcamb.ini.set("get_tensor_cls", "F")
+    magcamb.ini.set("magnetic_mode", "1")
+
+    magcamb.run()
+
+    comp_scalar = magcamb.load_scalarCls().values.T
+
+    ###########################
+    # compensated vector mode #
+    ###########################
+
+    magcamb.ini.set("get_scalar_cls", "F")
+    magcamb.ini.set("get_vector_cls", "T")
+    magcamb.ini.set("get_tensor_cls", "F")
+    magcamb.ini.set("magnetic_mode", "1")
+
+    magcamb.run()
+
+    comp_vector = magcamb.load_vectorCls().values.T
+
+    ##################################
+    # get primary cmb power spectrum #
+    ##################################
+
+    # open a camb session
+    CAMB_DIR = '/home/aaron/Workspace/research/CAMB-0.1.7/'
+    camb = cambex.CambSession(camb_bin=CAMB_DIR+'camb')
+
+    # define base parameter
+    PARAM_DIR = '/home/aaron/Workspace/research/MagCAMB/'
+    camb.set_base_params(PARAM_DIR+"custom/params/params.ini")
+
+    # set cosmological parameters
+    camb.ini.set("ombh2", "0.02225")
+    camb.ini.set("omch2", "0.1198")
+    camb.ini.set("hubble", "67.8")
+
+    # these two modes can be computed together
+    camb.ini.set("get_scalar_cls", "T")
+    camb.ini.set("get_vector_cls", "F")
+    camb.ini.set("get_tensor_cls", "T")
+
+    # run the session
+    camb.run()
+
+    # get the scalar mode
+    primary_scalar = camb.load_scalarCls().values.T
+    primary_tensor = camb.load_tensorCls().values.T
+    primary_lensed = camb.load_lensedCls().values.T
+
+    # total power spectrum
+    # generate an empty array to hold the total power spectra
+    ps = [primary_lensed, passive_scalar, passive_tensor,
+          comp_scalar, comp_vector]
+    N = min([p.shape[0] for p in ps])
+
+    total_ps = np.zeros((N,5))
+
+    # ell
+    total_ps[:, 0] = primary_lensed[:N, 0]
+
+    # ClTT
+    total_ps[:, 1] = primary_lensed[:N, 1] + passive_scalar[:N, 1] + \
+                     passive_tensor[:N, 1] + comp_scalar[:N, 1] + \
+                     comp_vector[:N, 1] 
+
+    # ClEE
+    total_ps[:, 2] = primary_lensed[:N, 2] + passive_scalar[:N, 2] + \
+                     passive_tensor[:N, 2] + comp_scalar[:N, 2] + \
+                     comp_vector[:N, 2]
+
+    # ClBB
+    total_ps[:, 3] = primary_lensed[:N, 3] + passive_tensor[:N, 3] + \
+                     comp_vector[:N, 3]
+
+    # ClTE
+    total_ps[:, 4] = primary_lensed[:N, 4] + passive_scalar[:N, 3] + \
+                     passive_tensor[:N, 4] + comp_scalar[:N, 3] + \
+                     comp_vector[:N, 4]
+
+    return total_ps
