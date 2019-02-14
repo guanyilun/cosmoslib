@@ -13,20 +13,39 @@ import cambex
 
 def remove_prefactor(ps):
     """Remove the l(l+1)/2\pi prefactor in a power spectrum"""
-    # create a new power spectrum
-    new_ps = ps.copy()
     ells = ps[:, 0]
-    new_ps[:,1:] *= 2*np.pi/(ells*(ells+1))
-    return new_ps
+    ps[:,1:] *= 2*np.pi/(ells*(ells+1))
+    return ps
 
 
 def add_prefactor(ps):
     """Add the l(l+1)/2\pi prefactor in a power spectrum"""
-    # create a new power spectrum
-    new_ps = ps.copy()
     ells = ps[:, 0]
-    new_ps[:,1:] /= 2*np.pi/(ells*(ells+1))
-    return new_ps
+    ps[:,1:] /= 2*np.pi/(ells*(ells+1))
+    return ps
+
+
+def add_noise_nl(ps, power_noise, beam_size, l_min, l_max):
+    """Add the noise term Nl to the power spectra based on the telescope noise 
+    properties.
+    
+    Args:
+        ps: power spectra
+        power_noise: power noise in \muK rad
+        beam_size: FWHM angular resolution of the beam in rad
+        l_min, l_max: limits of ells
+
+    Returns:
+        ps: power spectra with noises Nl added
+    """
+    NlT = power_noise**2*np.exp(ells*(ells+1)*beam_size**2/(8.*np.log(2)))
+    NlP = 2 * NlT
+
+    ps[:,1] += NlT
+    ps[:,2:4] += NlP
+    mask = np.logical_and(ells>=l_min, ells<=l_max)
+    
+    return ps[mask,:]
 
 
 def generate_camb_params(ombh2, omch2, tau, ln10e10As, ns, omk=0,
