@@ -11,6 +11,24 @@ import camb
 import cambex
 
 
+def remove_prefactor(ps):
+    """Remove the l(l+1)/2\pi prefactor in a power spectrum"""
+    # create a new power spectrum
+    new_ps = ps.copy()
+    ells = ps[:, 0]
+    new_ps[:,1:] *= 2*np.pi/(ells*(ells+1))
+    return new_ps
+
+
+def add_prefactor(ps):
+    """Add the l(l+1)/2\pi prefactor in a power spectrum"""
+    # create a new power spectrum
+    new_ps = ps.copy()
+    ells = ps[:, 0]
+    new_ps[:,1:] /= 2*np.pi/(ells*(ells+1))
+    return new_ps
+
+
 def generate_camb_params(ombh2, omch2, tau, ln10e10As, ns, omk=0,
                          lmax=5000, H0=67.11, r=0):
     """A wrapper for camb parameter generator.
@@ -37,7 +55,6 @@ def generate_cmb_power_spectra(pars, raw_cl=True):
     spectra is used.  
 
     Args:
-
         pars: camb.CAMBparams
         raw_cl: whether l(l+1)/2\pi prefactor is included, True means
                 will not include the prefactor
