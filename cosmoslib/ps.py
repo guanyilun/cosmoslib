@@ -8,24 +8,26 @@ from matplotlib import pyplot as plt
 import numpy as np
 from camb import model, initialpower
 import camb
-import cambex
-
-
-def remove_prefactor(ps):
-    """Remove the l(l+1)/2\pi prefactor in a power spectrum"""
-    ells = ps[:, 0]
-    ps[:,1:] *= 2*np.pi/(ells*(ells+1))
-    return ps
+from . import cambex
 
 
 def add_prefactor(ps):
     """Add the l(l+1)/2\pi prefactor in a power spectrum"""
     ells = ps[:, 0]
-    ps[:,1:] /= 2*np.pi/(ells*(ells+1))
+    for i in range(1,ps.shape[1]):
+        ps[:,i] /= 2*np.pi/(ells*(ells+1))
     return ps
 
 
-def add_noise_nl(ps, power_noise, beam_size, l_min, l_max):
+def remove_prefactor(ps):
+    """Remove the l(l+1)/2\pi prefactor in a power spectrum"""
+    ells = ps[:, 0]
+    for i in range(1,ps.shape[1]):
+        ps[:,i] *= 2*np.pi/(ells*(ells+1))
+    return ps
+
+
+def add_noise_nl(ps, power_noise, beam_size, l_min, l_max, prefactor=False):
     """Add the noise term Nl to the power spectra based on the telescope noise 
     properties.
     
@@ -38,14 +40,25 @@ def add_noise_nl(ps, power_noise, beam_size, l_min, l_max):
     Returns:
         ps: power spectra with noises Nl added
     """
+    ells = ps[:,0]
+
     NlT = power_noise**2*np.exp(ells*(ells+1)*beam_size**2/(8.*np.log(2)))
     NlP = 2 * NlT
+    new_ps = ps.copy()
 
-    ps[:,1] += NlT
-    ps[:,2:4] += NlP
+    if prefactor:
+        new_ps = remove_prefactor(new_ps)
+
+    new_ps[:,1] += NlT
+    new_ps[:,2] += NlP
+    new_ps[:,3] += NlP
+
+    if prefactor:
+        new_ps = add_prefactor(new_ps)
+
     mask = np.logical_and(ells>=l_min, ells<=l_max)
     
-    return ps[mask,:]
+    return new_ps[mask,:]
 
 
 def generate_camb_params(ombh2, omch2, tau, ln10e10As, ns, omk=0,
