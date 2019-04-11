@@ -6,8 +6,6 @@ with camb, power spectrum and covariance matrix
 
 from matplotlib import pyplot as plt
 import numpy as np
-from camb import model, initialpower
-import camb
 from . import cambex
 
 
@@ -210,82 +208,82 @@ def add_noise(ClTT, ClEE, ClBB, ClTE, pixel_noise, theta_fwhm):
     return TEB_to_TGC(ClTT, ClGG, ClCC, ClTG)
 
 
-  def calculate_covariance_matrix(ps, pixel_noise, beam_size, l_min,
-                                  l_max, f_sky, prefactor=False):
-      """Calculate the covariance matrix based on a model.
+def calculate_covariance_matrix(ps, pixel_noise, beam_size, l_min,
+                                l_max, f_sky, prefactor=False):
+    """Calculate the covariance matrix based on a model.
 
-      Args:
-          ps: power spectra
-          pixel_noise: noise per pixel
-          beam_size: beam size in degress (full width half minimum)
-          l_min, l_max: range of ells
-          f_sky: sky coverage fraction, 1 means full-sky coverage
+    Args:
+        ps: power spectra
+        pixel_noise: noise per pixel
+        beam_size: beam size in degress (full width half minimum)
+        l_min, l_max: range of ells
+        f_sky: sky coverage fraction, 1 means full-sky coverage
 
-      Returns:
-          cov: a tensor of size [n_ell, n_ps, n_ps], for example with
-               a lmax of 5000, the tensor size will be [5000, 4, 4]
-      """
-      # assuming the beam is a gaussian beam with an ell dependent
-      # beam size
-      if prefactor:
-          remove_prefactor(ps)
+    Returns:
+        cov: a tensor of size [n_ell, n_ps, n_ps], for example with
+             a lmax of 5000, the tensor size will be [5000, 4, 4]
+    """
+    # assuming the beam is a gaussian beam with an ell dependent
+    # beam size
+    if prefactor:
+        remove_prefactor(ps)
         
-      _ells = ps[:, 0]
+    _ells = ps[:, 0]
 
-      Wb = lambda l: np.exp(l*(l+1)*beam_size**2/(8.*np.log(2)))
+    Wb = lambda l: np.exp(l*(l+1)*beam_size**2/(8.*np.log(2)))
 
-      # calculate the noise parameter w^-1
-      wTinv = pixel_noise**2
-      wPinv = 2*wTinv
+    # calculate the noise parameter w^-1
+    wTinv = pixel_noise**2
+    wPinv = 2*wTinv
 
-      mask = np.logical_and(_ells>=l_min, _ells<=l_max)
+    mask = np.logical_and(_ells>=l_min, _ells<=l_max)
 
-      # extract power spectra
-      ells = ps[mask,0]
-      ClTT = ps[mask,1]
-      ClEE = ps[mask,2]
-      ClBB = ps[mask,3]
-      ClTE = ps[mask,4]
+    # extract power spectra
+    ells = ps[mask,0]
+    ClTT = ps[mask,1]
+    ClEE = ps[mask,2]
+    ClBB = ps[mask,3]
+    ClTE = ps[mask,4]
 
-      # initialize empty covariance tensor. Since the covariance matrix
-      # depends on ell, we will make a higher dimensional array [n_ell,
-      # n_ps, n_ps] where the first index represents different ells, the
-      # second and third parameters represents different power spectra
-      n_ells = len(ells)
-      cov = np.zeros([n_ells, 4, 4])
+    # initialize empty covariance tensor. Since the covariance matrix
+    # depends on ell, we will make a higher dimensional array [n_ell,
+    # n_ps, n_ps] where the first index represents different ells, the
+    # second and third parameters represents different power spectra
+    n_ells = len(ells)
+    cov = np.zeros([n_ells, 4, 4])
 
-      for (i, l) in enumerate(ells):
-          # T, T 
-          cov[i,0,0] = 2.0/(2*l+1)*(ClTT[i] + wTinv*Wb(l))**2
+    for (i, l) in enumerate(ells):
+        # T, T 
+        cov[i,0,0] = 2.0/(2*l+1)*(ClTT[i] + wTinv*Wb(l))**2
 
-          # E, E 
-          cov[i,1,1] = 2.0/(2*l+1)*(ClEE[i] + wPinv*Wb(l))**2 
+        # E, E 
+        cov[i,1,1] = 2.0/(2*l+1)*(ClEE[i] + wPinv*Wb(l))**2 
 
-          # B, B 
-          cov[i,2,2] = 2.0/(2*l+1)*(ClBB[i] + wPinv*Wb(l))**2 
+        # B, B 
+        cov[i,2,2] = 2.0/(2*l+1)*(ClBB[i] + wPinv*Wb(l))**2 
 
-          # TE, TE 
-          cov[i,3,3] = 1.0/(2*l+1)*(ClTE[i]**2 + (ClTT[i] + wTinv*Wb(l))
-                                    *(ClEE[i] + wPinv*Wb(l)))
+        # TE, TE 
+        cov[i,3,3] = 1.0/(2*l+1)*(ClTE[i]**2 + (ClTT[i] + wTinv*Wb(l))
+                                  *(ClEE[i] + wPinv*Wb(l)))
 
-          # T, E 
-          cov[i,0,1] = cov[i,1,0] = 2.0/(2*l+1)*ClTE[i]**2
+        # T, E 
+        cov[i,0,1] = cov[i,1,0] = 2.0/(2*l+1)*ClTE[i]**2
 
-          # T, TE
-          cov[i,0,3] = cov[i,3,0] = 2.0/(2*l+1)*ClTE[i]*(ClTT[i] +
-                                                         wTinv*Wb(l))
+        # T, TE
+        cov[i,0,3] = cov[i,3,0] = 2.0/(2*l+1)*ClTE[i]*(ClTT[i] +
+                                                       wTinv*Wb(l))
 
-          # E, TE 
-          cov[i,1,3] = cov[i,3,1] = 2.0/(2*l+1)*ClTE[i]*(ClEE[i] +
-                                                         wPinv*Wb(l))
+        # E, TE 
+        cov[i,1,3] = cov[i,3,1] = 2.0/(2*l+1)*ClTE[i]*(ClEE[i] +
+                                                       wPinv*Wb(l))
 
-      # now we include the effect of partial sky coverage
-      cov /= f_sky
+    # now we include the effect of partial sky coverage
+    cov /= f_sky
 
-      if prefactor:
-          add_prefactor(ps)
+    if prefactor:
+        add_prefactor(ps)
 
-      return ells, cov
+    return ells, cov
 
 
 def fisher_matrix(model, cov, ratio=0.01):
