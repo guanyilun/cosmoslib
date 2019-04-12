@@ -105,7 +105,7 @@ def add_noise_nl(ps, power_noise, beam_size, l_min, l_max, prefactor=False):
 
 def _decompose_ps(ps):
     """Decompose ps into individual components"""
-    return np.split(ps, range(ps.shape[1]), axis=1)
+    return ps[:,0], ps[:,1], ps[:,2], ps[:,3], ps[:,4]
 
 def gen_ps(ps, prefactor=True):
     """Generate a random power spectra realization
@@ -113,6 +113,7 @@ def gen_ps(ps, prefactor=True):
     Args:
         ps: power spectra
         prefactor: true if ps is Dl
+
     Returns:
         ps realization: consistent with prefactor choice
     """
@@ -128,16 +129,16 @@ def gen_ps(ps, prefactor=True):
     # a compiled version. A quick test shows that it takes >5
     # minutes to run! Note that we start from l=2 because l=0,1
     # are 0 for convenience
-    for i, l in enumerate(ells):
+    for i, l in enumerate(ells.astype('int')):
         # a faster version
         zeta1 = np.random.normal(0, 1, 2*l+1)*np.exp(1j*np.random.uniform(0, 2*np.pi, 2*l+1))
         zeta2 = np.random.normal(0, 1, 2*l+1)*np.exp(1j*np.random.uniform(0, 2*np.pi, 2*l+1))
         zeta3 = np.random.normal(0, 1, 2*l+1)*np.exp(1j*np.random.uniform(0, 2*np.pi, 2*l+1))
 
         # generate alm
-        aTlm = zeta1 * ClTT[l]**0.5
-        aGlm = zeta1 * ClTE[l] / (ClTT[l])**0.5 + zeta2*(ClEE[l] - ClTE[l]**2/ClTT[l])
-        aClm = zeta3 * ClBB[l]**0.5
+        aTlm = zeta1 * ClTT[i]**0.5
+        aGlm = zeta1 * ClTE[i] / (ClTT[i])**0.5 + zeta2*(ClEE[i] - ClTE[i]**2/ClTT[i])
+        aClm = zeta3 * ClBB[i]**0.5
 
         i_ClTT = np.sum(1.0 * np.abs(aTlm)**2 / (2*l+1))
         i_ClEE = np.sum(1.0 * np.abs(aGlm)**2 / (2*l+1))
@@ -153,7 +154,7 @@ def gen_ps(ps, prefactor=True):
     if prefactor:
         return Cl2Dl(m_ps)
     else:
-        return return m_ps
+        return m_ps
 
 def generate_power_spectra_realization(pars, raw_cl=True):
     """Generate a realization of the power spectra
