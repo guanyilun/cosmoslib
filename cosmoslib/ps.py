@@ -8,9 +8,25 @@ from matplotlib import pyplot as plt
 import numpy as np
 from . import cambex
 
+def _check_ps(ps):
+    """Check the type of power spectra"""
+    # if ps is a 2D array
+    if len(ps.shape)>1:
+        # if ps has five columns -> tensor-like
+        if ps.shape[-1] == 5:
+            return "TENSOR"
+        # if ps has four columns -> scaler-like
+        elif ps.shape[-1] == 4:
+            return "SCALER"
+        # not sure what's inside
+        else:
+            return None
+    else:
+        raise ValueError
 
 def add_prefactor(ps):
     """Add the l(l+1)/2\pi prefactor in a power spectrum"""
+    # check the dimension of power spectra
     ells = ps[:, 0]
     for i in range(1,ps.shape[1]):
         ps[:,i] /= 2*np.pi/(ells*(ells+1))
@@ -23,6 +39,16 @@ def remove_prefactor(ps):
     for i in range(1,ps.shape[1]):
         ps[:,i] *= 2*np.pi/(ells*(ells+1))
     return ps
+
+def Dl2Cl(ps):
+    """Dl to Cl, same as remove_prefactor. Implemented for 
+    readability"""
+    return remove_prefactor(ps)
+
+def Cl2Dl(ps):
+    """Cl to Dl, same as add_prefactor. Implemented for 
+    readability"""
+    return add_prefactor(ps)
 
 
 def N_l(ells, power_noise, beam_size):
