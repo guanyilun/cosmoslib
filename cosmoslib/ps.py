@@ -32,7 +32,6 @@ def add_prefactor(ps):
         ps[:,i] /= 2*np.pi/(ells*(ells+1))
     return ps
 
-
 def remove_prefactor(ps):
     """Remove the l(l+1)/2\pi prefactor in a power spectrum"""
     ells = ps[:, 0]
@@ -104,6 +103,57 @@ def add_noise_nl(ps, power_noise, beam_size, l_min, l_max, prefactor=False):
     
     return new_ps[mask,:]
 
+def _decompose_ps(ps):
+    """Decompose ps into individual components"""
+    return np.split(ps, range(ps.shape[1]), axis=1)
+
+def gen_ps(ps, prefactor=True):
+    """Generate a random power spectra realization
+    
+    Args:
+        ps: power spectra
+        prefactor: true if ps is Dl
+    Returns:
+        ps realization: consistent with prefactor choice
+    """
+    if prefactor:
+        ps = Dl2Cl(ps)
+    ells, ClTT, ClEE, ClBB, ClTE = _decompose_ps(ps)
+
+    # define empty arrays to hold the generated power spectra
+    m_ps = ps.copy()
+
+    # this is certainly slow, but I can use it as a benchmark
+    # to see how much acceleration I can get by changing into
+    # a compiled version. A quick test shows that it takes >5
+    # minutes to run! Note that we start from l=2 because l=0,1
+    # are 0 for convenience
+    for i, l in enumerate(ells):
+        # a faster version
+        zeta1 = np.random.normal(0, 1, 2*l+1)*np.exp(1j*np.random.uniform(0, 2*np.pi, 2*l+1))
+        zeta2 = np.random.normal(0, 1, 2*l+1)*np.exp(1j*np.random.uniform(0, 2*np.pi, 2*l+1))
+        zeta3 = np.random.normal(0, 1, 2*l+1)*np.exp(1j*np.random.uniform(0, 2*np.pi, 2*l+1))
+
+        # generate alm
+        aTlm = zeta1 * ClTT[l]**0.5
+        aGlm = zeta1 * ClTE[l] / (ClTT[l])**0.5 + zeta2*(ClEE[l] - ClTE[l]**2/ClTT[l])
+        aClm = zeta3 * ClBB[l]**0.5
+
+        i_ClTT = np.sum(1.0 * np.abs(aTlm)**2 / (2*l+1))
+        i_ClEE = np.sum(1.0 * np.abs(aGlm)**2 / (2*l+1))
+        i_ClBB = np.sum(1.0 * np.abs(aClm)**2 / (2*l+1))
+        i_ClTE = np.sum(1.0 * np.conj(aTlm)*aGlm / (2*l+1))
+
+        # assign the new values to the new array
+        m_ps[i,1] = i_ClTT
+        m_ps[i,2] = i_ClEE
+        m_ps[i,3] = i_ClBB
+        m_ps[i,4] = i_ClTE
+
+    if prefactor:
+        return Cl2Dl(m_ps)
+    else:
+        return return m_ps
 
 def generate_power_spectra_realization(pars, raw_cl=True):
     """Generate a realization of the power spectra
