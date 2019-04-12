@@ -25,6 +25,24 @@ def remove_prefactor(ps):
     return ps
 
 
+def N_l(ells, power_noise, beam_size):
+    """Calculate the noise spectra for a given noise-level and beam size.
+    
+    Args:
+        ells: 1D numpy array of ells 
+        power_noise: noise per pixel in muK-rad
+        beam_size: beam size (FWHM) in unit of rad
+
+    Returns:
+        ps: len(ells) x 3 array, first column is ells
+            the second column is N_lTT the third column
+            is N_lPP.  
+    """
+    NlT = power_noise**2*np.exp(ells*(ells+1)*beam_size**2/(8.*np.log(2)))
+    NlP = 2 * NlT
+
+    return np.stack([ells, NlT, NlP], axis=1)
+
 def add_noise_nl(ps, power_noise, beam_size, l_min, l_max, prefactor=False):
     """Add the noise term Nl to the power spectra based on the telescope noise 
     properties.
@@ -39,14 +57,16 @@ def add_noise_nl(ps, power_noise, beam_size, l_min, l_max, prefactor=False):
         ps: power spectra with noises Nl added
     """
     ells = ps[:,0]
+    
+    # calculate noise spectra
+    Nls = N_l(ells, power_noise, beam_size)
 
-    NlT = power_noise**2*np.exp(ells*(ells+1)*beam_size**2/(8.*np.log(2)))
-    NlP = 2 * NlT
     new_ps = ps.copy()
-
     if prefactor:
         new_ps = remove_prefactor(new_ps)
 
+    NlT = Nls[:,1]
+    NlP = Nls[:,2]
     new_ps[:,1] += NlT
     new_ps[:,2] += NlP
     new_ps[:,3] += NlP
@@ -59,67 +79,6 @@ def add_noise_nl(ps, power_noise, beam_size, l_min, l_max, prefactor=False):
     return new_ps[mask,:]
 
 
-def generate_camb_params(ombh2, omch2, tau, ln10e10As, ns, omk=0,
-                         lmax=5000, H0=67.11, r=0):
-    """A wrapper for camb parameter generator.
-    
-    Args:
-        cosmological parameters
-
-    Returns;
-        camb.CAMBparams
-    """
-    pars = camb.CAMBparams()
-    pars.set_cosmology(H0=H0, ombh2=ombh2, omch2=omch2, omk=omk,
-                       tau=tau)
-    pars.InitPower.set_params(As=np.exp(ln10e10As)*10**-10, ns=ns,
-                              r=r)
-    pars.set_for_lmax(lmax, lens_potential_accuracy=0)
-    return pars
-
-
-def generate_cmb_power_spectra(pars, raw_cl=True):
-    """A wrapper for CAMB function. 
-
-    Default unit of the spectrais muK, and by default the total power
-    spectra is used.  
-
-    Args:
-        pars: camb.CAMBparams
-        raw_cl: whether l(l+1)/2\pi prefactor is included, True means
-                will not include the prefactor
-
-    Returns:
-        ClTT, ClEE, ClBB, ClTE
-
-    """
-    results = camb.get_results(pars)
-    powers = results.get_cmb_power_spectra(pars, CMB_unit='muK',
-                                           raw_cl=raw_cl)
-    tot = powers['total']
-
-    # get the number of ells computed
-    n_ell = tot.shape[0]
-
-    # separate different spectra better readability
-    ClTT = tot[:,0]
-    ClEE = tot[:,1]
-    ClBB = tot[:,2]
-    ClTE = tot[:,3]
-    
-    return ClTT, ClEE, ClBB, ClTE
-
-
-def TGC_to_TEB(ClTT, ClGG, ClCC, ClTG):
-    """Transform TGC convention to TEB convension"""
-    return ClTT, 2*ClGG, 2*ClCC, np.sqrt(2)*ClTG
-
-
-def TEB_to_TGC(ClTT, ClEE, ClBB, ClTE):
-    """Transform TEB convention to TGC convension"""
-    return ClTT, 0.5*ClEE, 0.5*ClBB, 1.0/np.sqrt(2)*ClTE
-
-    
 def generate_power_spectra_realization(pars, raw_cl=True):
     """Generate a realization of the power spectra
 
