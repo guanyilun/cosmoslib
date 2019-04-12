@@ -117,6 +117,8 @@ def gen_ps(ps, prefactor=True):
     Returns:
         ps realization: consistent with prefactor choice
     """
+    # first make a copy to make sure we don't affect the original
+    ps = ps.copy()
     if prefactor:
         ps = Dl2Cl(ps)
     ells, ClTT, ClEE, ClBB, ClTE = _decompose_ps(ps)
@@ -137,13 +139,13 @@ def gen_ps(ps, prefactor=True):
 
         # generate alm
         aTlm = zeta1 * ClTT[i]**0.5
-        aGlm = zeta1 * ClTE[i] / (ClTT[i])**0.5 + zeta2*(ClEE[i] - ClTE[i]**2/ClTT[i])
-        aClm = zeta3 * ClBB[i]**0.5
+        aElm = zeta1 * ClTE[i] / (ClTT[i])**0.5 + zeta2*(ClEE[i] - ClTE[i]**2/ClTT[i])**0.5
+        aBlm = zeta3 * ClBB[i]**0.5
 
         i_ClTT = np.sum(1.0 * np.abs(aTlm)**2 / (2*l+1))
-        i_ClEE = np.sum(1.0 * np.abs(aGlm)**2 / (2*l+1))
-        i_ClBB = np.sum(1.0 * np.abs(aClm)**2 / (2*l+1))
-        i_ClTE = np.sum(1.0 * np.conj(aTlm)*aGlm / (2*l+1))
+        i_ClEE = np.sum(1.0 * np.abs(aElm)**2 / (2*l+1))
+        i_ClBB = np.sum(1.0 * np.abs(aBlm)**2 / (2*l+1))
+        i_ClTE = np.sum(1.0 * np.conj(aTlm)*aElm / (2*l+1))
 
         # assign the new values to the new array
         m_ps[i,1] = i_ClTT
