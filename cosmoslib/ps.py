@@ -107,7 +107,7 @@ def _decompose_ps(ps):
     """Decompose ps into individual components"""
     return ps[:,0], ps[:,1], ps[:,2], ps[:,3], ps[:,4]
 
-def gen_ps(ps, prefactor=True):
+def gen_ps_realization(ps, prefactor=True):
     """Generate a random power spectra realization
     
     Args:
@@ -242,7 +242,7 @@ def fisher_matrix(model, cov, ratio=0.01):
     Args: 
         model: a python dictionary that contains the cosmological
         parameters that one is interested in estimating the fisher
-        matrix between them
+        matrix between them (fiducial model)
 
         cov: the covariance matrix between the power spectra
 
@@ -312,8 +312,10 @@ def fisher_matrix(model, cov, ratio=0.01):
 
     return alpha, params
 
+##################
+# Magnetic field #
+##################
 
-# Magnetic field 
 def generate_ps(ombh2=0.02225, omch2=0.1198, hubble=67.8):
     """Generate the total power spectrum from primary and magnetic
     field contribution"""
