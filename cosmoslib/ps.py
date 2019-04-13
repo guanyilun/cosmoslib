@@ -158,8 +158,8 @@ def gen_ps(ps, prefactor=True):
     else:
         return m_ps
 
-def calculate_covariance_matrix(ps, pixel_noise, beam_size, l_min,
-                                l_max, f_sky, prefactor=False):
+def covmat(ps, pixel_noise, beam_size, l_min,
+           l_max, f_sky, prefactor=False):
     """Calculate the covariance matrix based on a model.
 
     Args:
@@ -313,6 +313,7 @@ def fisher_matrix(model, cov, ratio=0.01):
     return alpha, params
 
 
+# Magnetic field 
 def generate_ps(ombh2=0.02225, omch2=0.1198, hubble=67.8):
     """Generate the total power spectrum from primary and magnetic
     field contribution"""
