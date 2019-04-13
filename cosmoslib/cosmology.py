@@ -12,12 +12,6 @@ class Cosmology(object):
         self.base_params = base_params
         self.model_params = model_params
         self.mode = "TFF"  # scaler only
-        
-        # initialize variable to store output power spectrum
-        self.scalarCls = None
-        self.tensorCls = None
-        self.lensedCls = None
-        self.totCls = None
 
     def set_base_params(self, params):
         """Set the baseline parameters"""

@@ -1,4 +1,5 @@
 from matplotlib import pyplot as plt
+import numpy as np
 
 def plot_ps(total_ps, axes=None, **kwargs):
     """Plot the power spectra"""
