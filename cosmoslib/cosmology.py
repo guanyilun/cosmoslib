@@ -4,6 +4,8 @@ estimation, etc.
 """
 
 from .cambex import CambSession
+from scipy.interpolate import interp1d
+import numpy as np
 
 
 class Cosmology(object):
@@ -21,18 +23,18 @@ class Cosmology(object):
         """Set model specific parameters
         Args:
             params: a dictionary with the fiducial model that one is
-            interested in. 
+            interested in.
         Example:
             cm.set_model_params({"initial_ratio": 0.0042})
         """
         self.model_params.update(params)
 
     def set_mode(self, mode):
-        """Set the mode of interests here, the mode should be a 
-        three character string with T or F corresponding to 
+        """Set the mode of interests here, the mode should be a
+        three character string with T or F corresponding to
         scaler, vector and tensor mode, default to TFF"""
         self.mode = mode
-        
+
     def _update_mode(self):
         """Populate the mode information into model parameters"""
         self.set_model_params({
@@ -40,31 +42,34 @@ class Cosmology(object):
             "get_vector_cls": self.mode[1],
             "get_tensor_cls": self.mode[2]
         })
-        
+
     def run(self):
         """Run the cosmology model to get power spectra"""
         # define base parameters
         self.camb.set_base_params(self.base_params)
-        
+
         # update the modes of interests (default to scaler only)
         self._update_mode()
-        
+
         # populate the user defined model parameters
         for k, v in self.model_params.items():
             self.camb.ini.set(k, v)
-            
+
         # run camb sessions
         self.camb.run()
-        
+
         # load power spectra into memory
         self._load_ps()
-        
+
+        # return a user defined target spectrum
+        return self.target_spectrum()
+
     def _load_ps(self):
         try:
             self.scalarCls = self.camb.load_scalarCls().values.T
         except OSError:
             self.scalarCls = None
-            
+
         try:
             self.vectorCls = self.camb.load_vectorCls().values.T
         except OSError:
@@ -74,13 +79,83 @@ class Cosmology(object):
             self.tensorCls = self.camb.load_tensorCls().values.T
         except OSError:
             self.tensorCls = None
-        
+
         try:
             self.lensedCls = self.camb.load_lensedCls().values.T
         except OSError:
             self.lensedCls = None
-        
+
         try:
             self.totCls = self.camb.load_totCls().values.T
         except OSError:
             self.totCls = None
+
+    def target_spectrum(self):
+        """Define a target spectrum for for fisher matrix study. By default
+        it refers to the totCls"""
+        return self.totCls
+
+    def fisher_matrix(self, ells, cov, targets=[], ratio=0.01):
+        """Calculate the fisher matrix for a given covariance matrix
+
+        Args:
+            cov: covariance matrix lx4x4
+            targets: targeting cosmological parameters as a list
+            ratio: percentage step size to estimate derivatives
+        """
+        if len(targets)==0:
+            raise ValueError("No targets found, what do you want?")
+
+        model = self.model_params
+
+        dCldp_list = []
+        for p in targets:
+            if not p in model.keys():
+                print("Warning: %s not found in model, skipping..." % p)
+                continue
+
+            # make copies of model for variation of parameters
+            new_model_m1 = model.copy()
+            new_model_m2 = model.copy()
+            new_model_p1 = model.copy()
+            new_model_p2 = model.copy()
+
+            # step size
+            h = model[p]*ratio
+
+            new_model_m2[p] = model[p] - h
+            new_model_m1[p] = model[p] - 0.5*h
+            new_model_p1[p] = model[p] + 0.5*h
+            new_model_p2[p] = model[p] + h
+
+            self.set_model_params(new_model_m2)
+            ps_m2 = self.run()
+
+            self.set_model_params(new_model_m1)
+            ps_m1 = self.run()
+
+            self.set_model_params(new_model_p1)
+            ps_p1 = self.run()
+
+            self.set_model_params(new_model_p2)
+            ps_p2 = self.run()
+
+            # calculate differenciations to p
+            dCldp = (4.0/3.0*(ps_p1[:,1:]-ps_m1[:,1:]) - 1.0/6.0*(ps_p2[:,1:]-ps_m2[:,1:]))/h
+
+            # interpolate it into the given ells
+            dCldp_interp = interp1d(ps_m2[:,0], dCldp.T)(ells).T
+
+            # store it to a list
+            f = 2*np.pi/(ells*(ells+1))[:, None]
+            dCldp_list.append(dCldp_interp*f)
+
+        n_params = len(dCldp_list)
+        alpha = np.zeros([n_params, n_params])
+        n_ell = cov.shape[0]
+        for i in range(n_params):
+            for j in range(n_params):
+                for l in np.arange(2, n_ell):
+                    alpha[i,j] += np.einsum('i,ij,j', dCldp_list[i][l, :], np.linalg.inv(cov[l,:,:]), dCldp_list[j][l, :])
+
+        return alpha
