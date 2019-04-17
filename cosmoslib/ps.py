@@ -50,7 +50,7 @@ def Cl2Dl(ps):
     return add_prefactor(ps)
 
 
-def N_l(ells, power_noise, beam_size):
+def N_l(ells, power_noise, beam_size, prefactor=True):
     """Calculate the noise spectra for a given noise-level and beam size.
     
     Args:
@@ -66,9 +66,12 @@ def N_l(ells, power_noise, beam_size):
     NlT = power_noise**2*np.exp(ells*(ells+1)*beam_size**2/(8.*np.log(2)))
     NlP = 2 * NlT
 
-    return np.stack([ells, NlT, NlP], axis=1)
+    Nls = np.stack([ells, NlT, NlP, NlP, np.zeros(NlP.shape)], axis=1)
+    if prefactor:
+        Cl2Dl(Nls)
+    return Nls
 
-def add_noise_nl(ps, power_noise, beam_size, l_min, l_max, prefactor=False):
+def add_noise_nl(ps, power_noise, beam_size, l_min, l_max, prefactor=True):
     """Add the noise term Nl to the power spectra based on the telescope noise 
     properties.
     
@@ -159,7 +162,7 @@ def gen_ps_realization(ps, prefactor=True):
         return m_ps
 
 def covmat(ps, pixel_noise, beam_size, l_min,
-           l_max, f_sky, prefactor=False):
+           l_max, f_sky, prefactor=True):
     """Calculate the covariance matrix based on a model.
 
     Args:
