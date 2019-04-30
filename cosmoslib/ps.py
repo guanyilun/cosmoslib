@@ -87,7 +87,7 @@ def add_noise_nl(ps, power_noise, beam_size, l_min, l_max, prefactor=True):
     ells = ps[:,0]
     
     # calculate noise spectra
-    Nls = N_l(ells, power_noise, beam_size)
+    Nls = N_l(ells, power_noise, beam_size, prefactor=False)
 
     new_ps = ps.copy()
     if prefactor:

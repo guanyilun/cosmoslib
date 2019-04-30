@@ -9,6 +9,9 @@ import numpy as np
 
 
 class Cosmology(object):
+
+    target_spectrum = lambda x: x.totCls
+    
     def __init__(self, camb_bin=None, base_params=None, model_params={}):
         self.camb = CambSession(camb_bin=camb_bin)
         self.base_params = base_params
@@ -55,6 +58,9 @@ class Cosmology(object):
         for k, v in self.model_params.items():
             self.camb.ini.set(k, v)
 
+        # clean-up the folder to avoid reading wrong files
+        self.camb.cleanup()
+
         # run camb sessions
         self.camb.run()
 
@@ -62,7 +68,7 @@ class Cosmology(object):
         self._load_ps()
 
         # return a user defined target spectrum
-        return self.target_spectrum()
+        return self.target_spectrum(self)
 
     def _load_ps(self):
         try:
@@ -90,10 +96,10 @@ class Cosmology(object):
         except OSError:
             self.totCls = None
 
-    def target_spectrum(self):
-        """Define a target spectrum for for fisher matrix study. By default
-        it refers to the totCls"""
-        return self.totCls
+        try:
+            self.lensedtotCls = self.camb.load_lensedtotCls().values.T
+        except OSError:
+            self.lensedtotCls = None
 
     def fisher_matrix(self, ells, cov, targets=[], ratio=0.01):
         """Calculate the fisher matrix for a given covariance matrix
