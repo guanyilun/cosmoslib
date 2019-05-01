@@ -40,15 +40,32 @@ def remove_prefactor(ps):
         ps[:,i] *= 2*np.pi/(ells*(ells+1))
     return ps
 
-def Dl2Cl(ps):
+def Dl2Cl_(ps):
     """Dl to Cl, same as remove_prefactor. Implemented for 
     readability"""
     return remove_prefactor(ps)
 
-def Cl2Dl(ps):
+def Cl2Dl_(ps):
     """Cl to Dl, same as add_prefactor. Implemented for 
     readability"""
     return add_prefactor(ps)
+
+def Dl2Cl(ps):
+    """Add the l(l+1)/2\pi prefactor in a power spectrum"""
+    # check the dimension of power spectra
+    ells = ps[:, 0]
+    new_ps = ps.copy()
+    for i in range(1,ps.shape[1]):
+        new_ps[:,i] /= 2*np.pi/(ells*(ells+1))
+    return new_ps
+
+def Cl2Dl(ps):
+    """Remove the l(l+1)/2\pi prefactor in a power spectrum"""
+    ells = ps[:, 0]
+    new_ps = ps.copy()    
+    for i in range(1,ps.shape[1]):
+        new_ps[:,i] *= 2*np.pi/(ells*(ells+1))
+    return new_ps
 
 def resample(ps, ell):
     ell_old = ps[:, 0]
