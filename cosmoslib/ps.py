@@ -7,6 +7,7 @@ with camb, power spectrum and covariance matrix
 from matplotlib import pyplot as plt
 import numpy as np
 from . import cambex
+import scipy
 
 def _check_ps(ps):
     """Check the type of power spectra"""
@@ -48,6 +49,24 @@ def Cl2Dl(ps):
     """Cl to Dl, same as add_prefactor. Implemented for 
     readability"""
     return add_prefactor(ps)
+
+def resample(ps, ell):
+    ell_old = ps[:, 0]
+
+    # interpolate into the theory,
+    tt_old = ps[:, 1]
+    ee_old = ps[:, 2]
+    bb_old = ps[:, 3]
+    te_old = ps[:, 4]
+
+    tt_predicted = scipy.interpolate.interp1d(ell_old, tt_old)(ell)
+    te_predicted = scipy.interpolate.interp1d(ell_old, te_old)(ell)
+    ee_predicted = scipy.interpolate.interp1d(ell_old, ee_old)(ell)
+    bb_predicted = scipy.interpolate.interp1d(ell_old, bb_old)(ell)
+
+    cl_predicted = np.stack([ell, tt_predicted, ee_predicted, bb_predicted, te_predicted], axis=1)
+
+    return cl_predicted
 
 
 def N_l(ells, power_noise, beam_size, prefactor=True):
