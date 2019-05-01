@@ -30,8 +30,27 @@ class Cosmology(object):
         Example:
             cm.set_model_params({"initial_ratio": 0.0042})
         """
-        self.model_params.update(params)
+        self._update_model_params(params)
 
+    def _update_model_params(self, params):
+        """A translator function that make it convenient to define alias
+        or other consistency relation between the parameters"""
+        for k, v in params.items():
+            # define look up rules here
+            if k == 'r':
+                self.model_params['initial_ratio'] = v
+            elif k == 'h0':
+                self.model_params['hubble'] = v * 100.
+            elif k == 'log1e10As':
+                self.model_params['scalar_amp'] = np.exp(v)*1E-10
+            elif k == 'n_s':
+                self.model_params['scalar_spectral_index'] = v
+            elif k == 'tau':
+                self.model_params['re_optical_depth'] = v
+            # otherwise it's a direct translation                
+            else:
+                self.model_params[k] = params[k]
+                
     def set_mode(self, mode):
         """Set the mode of interests here, the mode should be a
         three character string with T or F corresponding to

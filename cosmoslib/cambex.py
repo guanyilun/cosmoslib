@@ -289,8 +289,6 @@ class CambSession:
 
         return CambResult(stuff)
 
-
-
     def cleanup(self):
         files = glob.glob(self.get_output_filename('*'))
         for f in files:
