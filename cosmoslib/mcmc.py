@@ -14,7 +14,8 @@ class MCMC(object):
     cosmology = None
     sampler = None
 
-    def __init__(self, ps_data=None, N_l=None, n_walkers=2, f_sky=1., initial_delta=0.01):
+    def __init__(self, ps_data=None, N_l=None, n_walkers=2, f_sky=1.,
+                 initial_delta=0.01):
         self.f_sky = f_sky
         self.ps_data = ps_data
         self.N_l = N_l
