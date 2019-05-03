@@ -38,7 +38,7 @@ class Cosmology(object):
         or other consistency relation between the parameters"""
         for k, v in params.items():
             # define look up rules here
-            if k == 'r':
+            if k == 'r_t':
                 self.model_params['initial_ratio'] = v
             elif k == 'h0':
                 self.model_params['hubble'] = v * 100.
