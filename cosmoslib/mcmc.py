@@ -147,7 +147,7 @@ class MCMC(object):
         """Set the data power spectra"""
         self.ps_data = ps_data
 
-    def run(self, N, pos0=None, pool=None):
+    def run(self, N, pos0=None):
         """Run the mcmc sampler with an ensemble sampler from emcee
 
         Parameters:
@@ -171,7 +171,7 @@ class MCMC(object):
         # has to be even and more than 2*ndim
 
         sampler = emcee.EnsembleSampler(self.n_walkers, ndim,
-                                        self.lnprob, pool=pool)
+                                        self.lnprob)
         sampler.run_mcmc(pos0, N)
 
         self.sampler = sampler

@@ -4,7 +4,6 @@ This module collects some reusable functions that I used when working
 with camb, power spectrum and covariance matrix
 """
 
-from matplotlib import pyplot as plt
 import numpy as np
 from . import cambex
 import scipy
