@@ -13,11 +13,12 @@ class Cosmology(object):
     target_spectrum = lambda x: x.totCls
     
     def __init__(self, camb_bin=None, base_params=None,
-                 model_params={}, rank=None):
+                 model_params={}, rank=None, legacy=False):
         self.camb = CambSession(camb_bin=camb_bin, rank=rank)
         self.base_params = base_params
         self.model_params = model_params
         self.mode = "TFF"  # scaler only
+        self.legacy = legacy  # old version
 
     def set_base_params(self, params):
         """Set the baseline parameters"""
@@ -39,15 +40,30 @@ class Cosmology(object):
         for k, v in params.items():
             # define look up rules here
             if k == 'r_t':
-                self.model_params['initial_ratio'] = v
+                if self.legacy:
+                    self.model_params['initial_ratio(1)'] = v
+                else:
+                    self.model_params['initial_ratio'] = v
             elif k == 'h0':
                 self.model_params['hubble'] = v * 100.
             elif k == 'log1e10As':
-                self.model_params['scalar_amp'] = np.exp(v)*1E-10
+                if self.legacy:
+                    self.model_params['scalar_amp(1)'] = np.exp(v)*1E-10
+                else:
+                    self.model_params['scalar_amp'] = np.exp(v)*1E-10
             elif k == 'n_s':
-                self.model_params['scalar_spectral_index'] = v
+                if self.legacy:
+                    self.model_params['scalar_spectral_index(1)'] = v
+                else:
+                    self.model_params['scalar_spectral_index'] = v
             elif k == 'tau':
                 self.model_params['re_optical_depth'] = v
+            elif k == 'B0':
+                self.model_params['magnetic_amp'] = v  # nG
+            elif k == 'n_B':
+                self.model_params['magnetic_ind'] = v
+            elif k == 'lrat':
+                self.model_params['magnetic_lrat'] = v
             # otherwise it's a direct translation                
             else:
                 self.model_params[k] = params[k]
