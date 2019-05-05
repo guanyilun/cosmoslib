@@ -44,6 +44,11 @@ class Cosmology(object):
                     self.model_params['initial_ratio(1)'] = v
                 else:
                     self.model_params['initial_ratio'] = v
+            elif k == 'initial_ratio':
+                if self.legacy:
+                    self.model_params['initial_ratio(1)'] = v
+                else:
+                    self.model_params[k] = v
             elif k == 'h0':
                 self.model_params['hubble'] = v * 100.
             elif k == 'log1e10As':
@@ -51,11 +56,21 @@ class Cosmology(object):
                     self.model_params['scalar_amp(1)'] = np.exp(v)*1E-10
                 else:
                     self.model_params['scalar_amp'] = np.exp(v)*1E-10
+            elif k == 'scalar_amp':
+                if self.legacy:
+                    self.model_params['scalar_amp(1)'] = v
+                else:
+                    self.model_params[k] = v
             elif k == 'n_s':
                 if self.legacy:
                     self.model_params['scalar_spectral_index(1)'] = v
                 else:
                     self.model_params['scalar_spectral_index'] = v
+            elif k == 'scalar_spectral_index':
+                if self.legacy:
+                    self.model_params['scalar_spectral_index(1)'] = v
+                else:
+                    self.model_params[k] = v
             elif k == 'tau':
                 self.model_params['re_optical_depth'] = v
             elif k == 'B0':
