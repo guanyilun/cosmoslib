@@ -89,34 +89,34 @@ class Cosmology(object):
         scaler, vector and tensor mode, default to TFF"""
         self.mode = mode
 
-    def _update_mode(self):
-        """Populate the mode information into model parameters"""
         self.set_model_params({
             "get_scalar_cls": self.mode[0],
             "get_vector_cls": self.mode[1],
             "get_tensor_cls": self.mode[2]
         })
 
+    def _populate_params(self):
+        """Pass all model params into the camb session"""
+        # populate the user defined model parameters
+        for k, v in self.model_params.items():
+            self.camb.ini.set(k, v)
+
     def run(self):
         """Run the cosmology model to get power spectra"""
         # define base parameters
         self.camb.set_base_params(self.base_params)
 
-        # update the modes of interests (default to scaler only)
-        self._update_mode()
-
-        # populate the user defined model parameters
-        for k, v in self.model_params.items():
-            self.camb.ini.set(k, v)
-
-        # clean-up the folder to avoid reading wrong files
-        self.camb.cleanup()
+        # pass all model params to camb session
+        self._populate_params()
 
         # run camb sessions
         self.camb.run()
 
         # load power spectra into memory
         self._load_ps()
+
+        # clean-up the folder to avoid reading wrong files
+        self.camb.cleanup()
 
         # return a user defined target spectrum
         return self.target_spectrum(self)
