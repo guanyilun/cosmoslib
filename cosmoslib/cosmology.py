@@ -11,7 +11,7 @@ import numpy as np
 class Cosmology(object):
 
     target_spectrum = lambda x: x.totCls
-    
+
     def __init__(self, camb_bin=None, base_params=None,
                  model_params={}, rank=None, legacy=False):
         self.camb = CambSession(camb_bin=camb_bin, rank=rank)
@@ -79,10 +79,10 @@ class Cosmology(object):
                 self.model_params['magnetic_ind'] = v
             elif k == 'lrat':
                 self.model_params['magnetic_lrat'] = v
-            # otherwise it's a direct translation                
+            # otherwise it's a direct translation
             else:
                 self.model_params[k] = params[k]
-                
+
     def set_mode(self, mode):
         """Set the mode of interests here, the mode should be a
         three character string with T or F corresponding to
@@ -216,3 +216,116 @@ class Cosmology(object):
                     alpha[i,j] += np.einsum('i,ij,j', dCldp_list[i][l, :], np.linalg.inv(cov[l,:,:]), dCldp_list[j][l, :])
 
         return alpha
+
+
+class MagCosmology(Cosmology):
+    def __init__(self, camb_bin=None, base_params=None,
+                 model_params={}, rank=None, legacy=False):
+        """Cosmology object that deals with cosmology with primordial
+        magnetic field. It uses the magcamb package"""
+        Cosmology.__init__(self, camb_bin, base_params, model_params,
+                          rank, legacy)
+
+    def run(self):
+        """Run the cosmology model to get power spectra"""
+
+        # define base parameters
+        self.camb.set_base_params(self.base_params)
+
+        # these two modes can be computed together
+        self.set_mode("TFT")
+        self.set_model_params({
+            "magnetic_mode": "2"
+        })
+        self.populate_params()
+
+        # run the session
+        self.camb.run()
+
+        # collect power spectra
+        passive_scalar = self.camb.load_scalarCls().values.T
+        passive_tensor = self.camb.load_tensorCls().values.T
+
+        ###########################
+        # compensated scalar mode #
+        ###########################
+        self.set_mode("TFF")
+        self.set_model_params({
+            "magnetic_mode": "1"
+        })
+        self.populate_params()
+
+        # run the session
+        self.camb.run()
+
+        # collect power spectra
+        comp_scalar = self.camb.load_scalarCls().values.T
+
+        ###########################
+        # compensated vector mode #
+        ###########################
+        self.set_mode("FTF")
+        self.set_model_params({
+            "magnetic_mode": "1"
+        })
+        self.populate_params()
+
+        # run the session
+        self.camb.run()
+
+        # collect power spectra
+        comp_vector = self.camb.load_vectorCls().values.T
+
+        ##################################
+        # get primary cmb power spectrum #
+        ##################################
+
+        # these two modes can be computed together
+        self.set_mode("TFT")
+        self.set_model_params({
+            "initial_condition": "6",
+            "vector_mode": "0",
+            "do_lensing": "T",
+        })
+        self.populate_params()
+
+        # run the session
+        self.camb.run()
+
+        # collect power spectra
+        primary_scalar = self.camb.load_scalarCls().values.T
+        primary_tensor = self.camb.load_tensorCls().values.T
+        primary_lensed = self.camb.load_lensedCls().values.T
+
+        # total power spectrum
+        # generate an empty array to hold the total power spectra
+        ps = [primary_lensed, passive_scalar, passive_tensor,
+              comp_scalar, comp_vector]
+        N = min([p.shape[0] for p in ps])
+
+        total_ps = np.zeros((N,5))
+
+        # ell
+        total_ps[:, 0] = primary_lensed[:N, 0]
+
+        # ClTT
+        total_ps[:, 1] = primary_lensed[:N, 1] + passive_scalar[:N, 1] + \
+                         passive_tensor[:N, 1] + comp_scalar[:N, 1] + \
+                         comp_vector[:N, 1]
+
+        # ClEE
+        total_ps[:, 2] = primary_lensed[:N, 2] + passive_scalar[:N, 2] + \
+                         passive_tensor[:N, 2] + comp_scalar[:N, 2] + \
+                         comp_vector[:N, 2]
+
+        # ClBB
+        total_ps[:, 3] = primary_lensed[:N, 3] + passive_tensor[:N, 3] + \
+                         comp_vector[:N, 3]
+
+        # ClTE
+        total_ps[:, 4] = primary_lensed[:N, 4] + passive_scalar[:N, 3] + \
+                         passive_tensor[:N, 4] + comp_scalar[:N, 3] + \
+                         comp_vector[:N, 4]
+
+        # return a user defined target spectrum
+        return total_ps
