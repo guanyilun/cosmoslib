@@ -11,12 +11,13 @@ import numpy as np
 class Cosmology(object):
 
     def __init__(self, camb_bin=None, base_params=None,
-                 model_params={}, rank=None):
+                 model_params={}, rank=None, legacy=False):
         self.camb = CambSession(camb_bin=camb_bin, rank=rank)
         self.base_params = base_params
         self.model_params = model_params
         self.mode = "TFF"  # scaler only
         self.target_spectrum = lambda x: x.totCls
+        self.legacy = legacy  # old version
 
     def set_base_params(self, params):
         """Set the baseline parameters"""
@@ -38,53 +39,83 @@ class Cosmology(object):
         for k, v in params.items():
             # define look up rules here
             if k == 'r_t':
-                self.model_params['initial_ratio'] = v
+                if self.legacy:
+                    self.model_params['initial_ratio(1)'] = v
+                else:
+                    self.model_params['initial_ratio'] = v
+            elif k == 'initial_ratio':
+                if self.legacy:
+                    self.model_params['initial_ratio(1)'] = v
+                else:
+                    self.model_params[k] = v
             elif k == 'h0':
                 self.model_params['hubble'] = v * 100.
             elif k == 'log1e10As':
-                self.model_params['scalar_amp'] = np.exp(v)*1E-10
+                if self.legacy:
+                    self.model_params['scalar_amp(1)'] = np.exp(v)*1E-10
+                else:
+                    self.model_params['scalar_amp'] = np.exp(v)*1E-10
+            elif k == 'scalar_amp':
+                if self.legacy:
+                    self.model_params['scalar_amp(1)'] = v
+                else:
+                    self.model_params[k] = v
             elif k == 'n_s':
-                self.model_params['scalar_spectral_index'] = v
+                if self.legacy:
+                    self.model_params['scalar_spectral_index(1)'] = v
+                else:
+                    self.model_params['scalar_spectral_index'] = v
+            elif k == 'scalar_spectral_index':
+                if self.legacy:
+                    self.model_params['scalar_spectral_index(1)'] = v
+                else:
+                    self.model_params[k] = v
             elif k == 'tau':
                 self.model_params['re_optical_depth'] = v
-            # otherwise it's a direct translation                
+            elif k == 'B0':
+                self.model_params['magnetic_amp'] = v  # nG
+            elif k == 'n_B':
+                self.model_params['magnetic_ind'] = v
+            elif k == 'lrat':
+                self.model_params['magnetic_lrat'] = v
+            # otherwise it's a direct translation
             else:
                 self.model_params[k] = params[k]
-                
+
     def set_mode(self, mode):
         """Set the mode of interests here, the mode should be a
         three character string with T or F corresponding to
         scaler, vector and tensor mode, default to TFF"""
         self.mode = mode
 
-    def _update_mode(self):
-        """Populate the mode information into model parameters"""
         self.set_model_params({
             "get_scalar_cls": self.mode[0],
             "get_vector_cls": self.mode[1],
             "get_tensor_cls": self.mode[2]
         })
 
+    def _populate_params(self):
+        """Pass all model params into the camb session"""
+        # populate the user defined model parameters
+        for k, v in self.model_params.items():
+            self.camb.ini.set(k, v)
+
     def run(self):
         """Run the cosmology model to get power spectra"""
         # define base parameters
         self.camb.set_base_params(self.base_params)
 
-        # update the modes of interests (default to scaler only)
-        self._update_mode()
-
-        # populate the user defined model parameters
-        for k, v in self.model_params.items():
-            self.camb.ini.set(k, v)
-
-        # clean-up the folder to avoid reading wrong files
-        self.camb.cleanup()
+        # pass all model params to camb session
+        self._populate_params()
 
         # run camb sessions
         self.camb.run()
 
         # load power spectra into memory
         self._load_ps()
+
+        # clean-up the folder to avoid reading wrong files
+        self.camb.cleanup()
 
         # return a user defined target spectrum
         return self.target_spectrum(self)
@@ -184,3 +215,116 @@ class Cosmology(object):
                     alpha[i,j] += np.einsum('i,ij,j', dCldp_list[i][l, :], np.linalg.inv(cov[l,:,:]), dCldp_list[j][l, :])
 
         return alpha
+
+
+class MagCosmology(Cosmology):
+    def __init__(self, camb_bin=None, base_params=None,
+                 model_params={}, rank=None, legacy=False):
+        """Cosmology object that deals with cosmology with primordial
+        magnetic field. It uses the magcamb package"""
+        Cosmology.__init__(self, camb_bin, base_params, model_params,
+                          rank, legacy)
+
+    def run(self):
+        """Run the cosmology model to get power spectra"""
+
+        # define base parameters
+        self.camb.set_base_params(self.base_params)
+
+        # these two modes can be computed together
+        self.set_mode("TFT")
+        self.set_model_params({
+            "magnetic_mode": "2"
+        })
+        self.populate_params()
+
+        # run the session
+        self.camb.run()
+
+        # collect power spectra
+        passive_scalar = self.camb.load_scalarCls().values.T
+        passive_tensor = self.camb.load_tensorCls().values.T
+
+        ###########################
+        # compensated scalar mode #
+        ###########################
+        self.set_mode("TFF")
+        self.set_model_params({
+            "magnetic_mode": "1"
+        })
+        self.populate_params()
+
+        # run the session
+        self.camb.run()
+
+        # collect power spectra
+        comp_scalar = self.camb.load_scalarCls().values.T
+
+        ###########################
+        # compensated vector mode #
+        ###########################
+        self.set_mode("FTF")
+        self.set_model_params({
+            "magnetic_mode": "1"
+        })
+        self.populate_params()
+
+        # run the session
+        self.camb.run()
+
+        # collect power spectra
+        comp_vector = self.camb.load_vectorCls().values.T
+
+        ##################################
+        # get primary cmb power spectrum #
+        ##################################
+
+        # these two modes can be computed together
+        self.set_mode("TFT")
+        self.set_model_params({
+            "initial_condition": "6",
+            "vector_mode": "0",
+            "do_lensing": "T",
+        })
+        self.populate_params()
+
+        # run the session
+        self.camb.run()
+
+        # collect power spectra
+        primary_scalar = self.camb.load_scalarCls().values.T
+        primary_tensor = self.camb.load_tensorCls().values.T
+        primary_lensed = self.camb.load_lensedCls().values.T
+
+        # total power spectrum
+        # generate an empty array to hold the total power spectra
+        ps = [primary_lensed, passive_scalar, passive_tensor,
+              comp_scalar, comp_vector]
+        N = min([p.shape[0] for p in ps])
+
+        total_ps = np.zeros((N,5))
+
+        # ell
+        total_ps[:, 0] = primary_lensed[:N, 0]
+
+        # ClTT
+        total_ps[:, 1] = primary_lensed[:N, 1] + passive_scalar[:N, 1] + \
+                         passive_tensor[:N, 1] + comp_scalar[:N, 1] + \
+                         comp_vector[:N, 1]
+
+        # ClEE
+        total_ps[:, 2] = primary_lensed[:N, 2] + passive_scalar[:N, 2] + \
+                         passive_tensor[:N, 2] + comp_scalar[:N, 2] + \
+                         comp_vector[:N, 2]
+
+        # ClBB
+        total_ps[:, 3] = primary_lensed[:N, 3] + passive_tensor[:N, 3] + \
+                         comp_vector[:N, 3]
+
+        # ClTE
+        total_ps[:, 4] = primary_lensed[:N, 4] + passive_scalar[:N, 3] + \
+                         passive_tensor[:N, 4] + comp_scalar[:N, 3] + \
+                         comp_vector[:N, 4]
+
+        # return a user defined target spectrum
+        return total_ps
