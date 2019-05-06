@@ -8,12 +8,6 @@ from cosmoslib.ps import Dl2Cl, resample
 
 class MCMC(object):
 
-    base_params = {}
-    fit_params = {}
-    fit_keys = []  # specify an ordering of the param keys
-    cosmology = None
-    sampler = None
-
     def __init__(self, ps_data=None, N_l=None, n_walkers=2, f_sky=1.,
                  initial_delta=0.01):
         self.f_sky = f_sky
@@ -21,6 +15,11 @@ class MCMC(object):
         self.N_l = N_l
         self.n_walkers = n_walkers
         self.initial_delta = initial_delta
+        self.sampler = None
+        self.cosmology = None
+        self.base_params = {}
+        self.fit_params = {}
+        self.fit_keys = []
 
     def set_params(self, params):
         """This method assigns parameters to the MCMC algorithm"""

@@ -10,14 +10,13 @@ import numpy as np
 
 class Cosmology(object):
 
-    target_spectrum = lambda x: x.totCls
-    
     def __init__(self, camb_bin=None, base_params=None,
                  model_params={}, rank=None):
         self.camb = CambSession(camb_bin=camb_bin, rank=rank)
         self.base_params = base_params
         self.model_params = model_params
         self.mode = "TFF"  # scaler only
+        self.target_spectrum = lambda x: x.totCls
 
     def set_base_params(self, params):
         """Set the baseline parameters"""
