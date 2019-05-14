@@ -31,56 +31,61 @@ class Cosmology(object):
         Example:
             cm.set_model_params({"initial_ratio": 0.0042})
         """
-        self._update_model_params(params)
+        self.model_params.update(params)
 
-    def _update_model_params(self, params):
+
+    def _populate_params(self, exclude_list=[]):
         """A translator function that make it convenient to define alias
         or other consistency relation between the parameters"""
-        for k, v in params.items():
+        for k, v in self.model_params.items():
+            # have an option to skip certain keys
+            if k in exclude_list:
+                continue
+
             # define look up rules here
             if k == 'r_t':
                 if self.legacy:
-                    self.model_params['initial_ratio(1)'] = v
+                    self.camb.ini.set('initial_ratio(1)', v)
                 else:
-                    self.model_params['initial_ratio'] = v
+                    self.camb.ini.set('initial_ratio', v)
             elif k == 'initial_ratio':
                 if self.legacy:
-                    self.model_params['initial_ratio(1)'] = v
+                    self.camb.ini.set('initial_ratio(1)', v)
                 else:
-                    self.model_params[k] = v
+                    self.camb.ini.set(k, v)
             elif k == 'h0':
-                self.model_params['hubble'] = v * 100.
+                self.camb.ini.set('hubble', v * 100.)
             elif k == 'log1e10As':
                 if self.legacy:
-                    self.model_params['scalar_amp(1)'] = np.exp(v)*1E-10
+                    self.camb.ini.set('scalar_amp(1)', np.exp(v)*1E-10)
                 else:
-                    self.model_params['scalar_amp'] = np.exp(v)*1E-10
+                    self.camb.ini.set('scalar_amp', np.exp(v)*1E-10)
             elif k == 'scalar_amp':
                 if self.legacy:
-                    self.model_params['scalar_amp(1)'] = v
+                    self.camb.ini.set('scalar_amp(1)', v)
                 else:
-                    self.model_params[k] = v
+                    self.camb.ini.set(k, v)
             elif k == 'n_s':
                 if self.legacy:
-                    self.model_params['scalar_spectral_index(1)'] = v
+                    self.camb.ini.set('scalar_spectral_index(1)', v)
                 else:
-                    self.model_params['scalar_spectral_index'] = v
+                    self.camb.ini.set('scalar_spectral_index',  v)
             elif k == 'scalar_spectral_index':
                 if self.legacy:
-                    self.model_params['scalar_spectral_index(1)'] = v
+                    self.camb.ini.set('scalar_spectral_index(1)', v)
                 else:
-                    self.model_params[k] = v
+                    self.camb.ini.set(k, v)
             elif k == 'tau':
-                self.model_params['re_optical_depth'] = v
+                self.camb.ini.set('re_optical_depth', v)
             elif k == 'B0':
-                self.model_params['magnetic_amp'] = v  # nG
+                self.camb.ini.set('magnetic_amp', v)  # nG
             elif k == 'n_B':
-                self.model_params['magnetic_ind'] = v
+                self.camb.ini.set('magnetic_ind', v)
             elif k == 'lrat':
-                self.model_params['magnetic_lrat'] = v
+                self.camb.ini.set('magnetic_lrat', v)
             # otherwise it's a direct translation
             else:
-                self.model_params[k] = params[k]
+                self.camb.ini.set(k, v)
 
     def set_mode(self, mode):
         """Set the mode of interests here, the mode should be a
@@ -93,12 +98,6 @@ class Cosmology(object):
             "get_vector_cls": self.mode[1],
             "get_tensor_cls": self.mode[2]
         })
-
-    def _populate_params(self):
-        """Pass all model params into the camb session"""
-        # populate the user defined model parameters
-        for k, v in self.model_params.items():
-            self.camb.ini.set(k, v)
 
     def run(self):
         """Run the cosmology model to get power spectra"""
