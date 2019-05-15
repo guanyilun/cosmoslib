@@ -119,6 +119,12 @@ class Cosmology(object):
         # return a user defined target spectrum
         return self.target_spectrum(self)
 
+    def full_run(self):
+        """This will be the method called by MCMC sampler. It can be the same
+        or different to the run method. By default it's the same as self.run()
+        """
+        self.run()
+
     def _load_ps(self):
         try:
             self.scalarCls = self.camb.load_scalarCls().values.T

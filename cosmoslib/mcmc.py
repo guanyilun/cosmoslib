@@ -122,7 +122,7 @@ class MCMC(object):
 
         self.cosmology.set_model_params(model_params)
 
-        return self.cosmology.run()
+        return self.cosmology.full_run()
 
     def lnprob(self, theta):
         ps_theory = self.generate_theory(theta)
