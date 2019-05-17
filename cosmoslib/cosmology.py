@@ -219,23 +219,3 @@ class Cosmology(object):
                     alpha[i,j] += np.einsum('i,ij,j', dCldp_list[i][l, :], np.linalg.inv(cov[l,:,:]), dCldp_list[j][l, :])
 
         return alpha
-
-    def get_bf_params(self):
-        # get best fit parameters
-        whmax = self.sampler.flatlnprobability.argmax()
-        bf_values = self.sampler.flatchain[whmax,:]
-
-        bf_params = {}
-        for i, k in enumerate(self.fit_keys):
-            bf_params[k] = bf_values[i]
-
-        return bf_params
-
-    def get_bf_cosmology(self):
-        import copy
-
-        bf_params = self.get_bf_params()
-        cosmology = copy.deepcopy(self.cosmology)
-
-        cosmology.set_model_params(bf_params)
-        return cosmology
