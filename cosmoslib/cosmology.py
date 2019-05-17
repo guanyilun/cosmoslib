@@ -122,7 +122,7 @@ class Cosmology(object):
         """This will be the method called by MCMC sampler. It can be the same
         or different to the run method. By default it's the same as self.run()
         """
-        self.run()
+        return self.run()
 
     def _load_ps(self):
         try:
