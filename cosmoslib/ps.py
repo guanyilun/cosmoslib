@@ -103,7 +103,7 @@ def N_l(ells, power_noise, beam_size, prefactor=True):
 
     Nls = np.stack([ells, NlT, NlP, NlP, np.zeros(NlP.shape)], axis=1)
     if prefactor:
-        Cl2Dl(Nls)
+        Cl2Dl_(Nls)
     return Nls
 
 def add_noise_nl(ps, power_noise, beam_size, l_min, l_max, prefactor=True):
