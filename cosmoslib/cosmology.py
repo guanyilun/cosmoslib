@@ -11,8 +11,9 @@ import numpy as np
 class Cosmology(object):
 
     def __init__(self, camb_bin=None, base_params=None,
-                 model_params={}, rank=None, legacy=False):
-        self.camb = CambSession(camb_bin=camb_bin, rank=rank)
+                 model_params={}, rank=None, legacy=False, output_dir=None):
+        self.camb = CambSession(camb_bin=camb_bin, rank=rank, 
+                                output_dir=output_dir)
         self.base_params = base_params
         self.model_params = model_params
         self.mode = "TFF"  # scaler only
