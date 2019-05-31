@@ -9,7 +9,7 @@ from cosmoslib.ps import Dl2Cl, resample
 class MCMC(object):
 
     def __init__(self, ps_data=None, N_l=None, n_walkers=2, f_sky=1.,
-                 initial_delta=0.01):
+                 initial_delta=0.01, save_samples=100, checkpoint_file=None):
         self.f_sky = f_sky
         self.ps_data = ps_data
         self.N_l = N_l
@@ -20,6 +20,9 @@ class MCMC(object):
         self.base_params = {}
         self.fit_params = {}
         self.fit_keys = []
+        self.save_samples = save_samples
+        self._counter = 0
+        self.checkpoint_file = checkpoint_file
 
     def set_params(self, params):
         """This method assigns parameters to the MCMC algorithm"""
@@ -55,7 +58,7 @@ class MCMC(object):
         return 0.
 
     @staticmethod
-    def exact_likihood(ps_theory, ps_data, nl, f_sky=1., prefactor=True):
+    def exact_likelihood(ps_theory, ps_data, nl, f_sky=1., prefactor=True):
         """Calculate the exact likelihood based on the T, E, B, TE power
         spectra.
 
@@ -124,13 +127,21 @@ class MCMC(object):
 
         return self.cosmology.full_run()
 
+    def checkpoint(self):
+        np.save(self.checkpoint_file, self.sampler.chain)
+
     def lnprob(self, theta):
+        # update counter
+        self._counter += 1
+        if self._counter % self.save_samples == 0:
+            self.checkpoint()
+
         ps_theory = self.generate_theory(theta)
 
         prior = self.lnprior(theta)
         if np.isfinite(prior):
-            like = MCMC.exact_likihood(ps_theory, self.ps_data,
-                                       self.N_l, self.f_sky)
+            like = MCMC.exact_likelihood(ps_theory, self.ps_data,
+                                         self.N_l, self.f_sky)
             print("Parameter: %s\t loglike: %.2f" % (theta, like))
             return prior + like
         else:
@@ -156,6 +167,7 @@ class MCMC(object):
               generator, but it can be supplied manually
 
         """
+        self._counter = 0
         ndim = len(self.fit_keys)
 
         if self.n_walkers < 2*ndim:
@@ -171,9 +183,9 @@ class MCMC(object):
 
         sampler = emcee.EnsembleSampler(self.n_walkers, ndim,
                                         self.lnprob)
+        self.sampler = sampler
         sampler.run_mcmc(pos0, N)
 
-        self.sampler = sampler
         return self.sampler
 
     def generate_initial_pos(self):
