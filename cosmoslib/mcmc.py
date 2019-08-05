@@ -3,6 +3,7 @@ mcmc study."""
 
 import numpy as np
 import emcee
+import dill as pickle
 
 from cosmoslib.ps import Dl2Cl, resample
 
@@ -124,11 +125,21 @@ class MCMC(object):
             model_params[k] = theta[i]
 
         self.cosmology.set_model_params(model_params)
+        try:
+            results = self.cosmology.full_run()
+        except Exception as e:
+            print("%s occurred, loglike=-np.inf" % type(e))
+            import traceback; traceback.print_exc()
+            return None, True  # the second return refers to error
 
-        return self.cosmology.full_run()
+        return results, False
 
     def checkpoint(self):
-        np.save(self.checkpoint_file, self.sampler.chain)
+        # np.save(self.checkpoint_file, self.sampler.chain)
+        # test saving the object
+        print("Checkpointing...")
+        # pickle.dump(self, open(self.checkpoint_file, "wb"))
+        pickle.dump(self, open(self.checkpoint_file, "wb"))
 
     def lnprob(self, theta):
         # update counter
@@ -136,8 +147,12 @@ class MCMC(object):
         if self._counter % self.save_samples == 0:
             self.checkpoint()
 
-        ps_theory = self.generate_theory(theta)
+        ps_theory, err = self.generate_theory(theta)
+        # if there is an error, reject this data point
+        if err:
+            return -np.inf
 
+        # now i trust that there is no error
         prior = self.lnprior(theta)
         if np.isfinite(prior):
             like = MCMC.exact_likelihood(ps_theory, self.ps_data,
@@ -157,7 +172,7 @@ class MCMC(object):
         """Set the data power spectra"""
         self.ps_data = ps_data
 
-    def run(self, N, pos0=None):
+    def run(self, N, pos0=None, resume=False):
         """Run the mcmc sampler with an ensemble sampler from emcee
 
         Parameters:
@@ -165,6 +180,7 @@ class MCMC(object):
         N: number of samples to be made for each
         pos0: initial positions, default to use built-in initial pos0
               generator, but it can be supplied manually
+        resume: whether to resume from the checkpoint file
 
         """
         self._counter = 0
@@ -176,7 +192,11 @@ class MCMC(object):
                   % self.n_walkers)
 
         if not pos0:
-            pos0 = self.generate_initial_pos()
+            if not resume:
+                pos0 = self.generate_initial_pos()
+            else:
+                print("Resuming from checkpoint file...")
+                pos0 = self.get_initial_pos_from_ckp()
 
         # check if n_walker satisfy the requirement that it
         # has to be even and more than 2*ndim
@@ -200,6 +220,15 @@ class MCMC(object):
             pos0.append(pos)
 
         return pos0
+
+    def get_initial_pos_from_ckp(self):
+        """Get the initial position from an unfinished chain"""
+        with open(self.checkpoint_file, "rb") as f:
+            data = pickle.load(f)
+        n_existing = data.sampler.iterations-1
+        initial_pos = data.sampler.chain[:,n_existing-1,:]
+        del data
+        return initial_pos
 
     def reset_params(self):
         self.base_params = {}
