@@ -40,12 +40,12 @@ def remove_prefactor(ps):
     return ps
 
 def Dl2Cl_(ps):
-    """Dl to Cl, same as remove_prefactor. Implemented for 
+    """Dl to Cl, same as remove_prefactor. Implemented for
     readability"""
     return remove_prefactor(ps)
 
 def Cl2Dl_(ps):
-    """Cl to Dl, same as add_prefactor. Implemented for 
+    """Cl to Dl, same as add_prefactor. Implemented for
     readability"""
     return add_prefactor(ps)
 
@@ -61,7 +61,7 @@ def Dl2Cl(ps):
 def Cl2Dl(ps):
     """Remove the l(l+1)/2\pi prefactor in a power spectrum"""
     ells = ps[:, 0]
-    new_ps = ps.copy()    
+    new_ps = ps.copy()
     for i in range(1,ps.shape[1]):
         new_ps[:,i] *= 2*np.pi/(ells*(ells+1))
     return new_ps
@@ -87,16 +87,16 @@ def resample(ps, ell):
 
 def N_l(ells, power_noise, beam_size, prefactor=True):
     """Calculate the noise spectra for a given noise-level and beam size.
-    
+
     Args:
-        ells: 1D numpy array of ells 
+        ells: 1D numpy array of ells
         power_noise: noise per pixel in muK-rad
         beam_size: beam size (FWHM) in unit of rad
 
     Returns:
         ps: len(ells) x 3 array, first column is ells
             the second column is N_lTT the third column
-            is N_lPP.  
+            is N_lPP.
     """
     NlT = power_noise**2*np.exp(ells*(ells+1)*beam_size**2/(8.*np.log(2)))
     NlP = 2 * NlT
@@ -107,9 +107,9 @@ def N_l(ells, power_noise, beam_size, prefactor=True):
     return Nls
 
 def add_noise_nl(ps, power_noise, beam_size, l_min, l_max, prefactor=True):
-    """Add the noise term Nl to the power spectra based on the telescope noise 
+    """Add the noise term Nl to the power spectra based on the telescope noise
     properties.
-    
+
     Args:
         ps: power spectra
         power_noise: power noise in \muK rad
@@ -120,7 +120,7 @@ def add_noise_nl(ps, power_noise, beam_size, l_min, l_max, prefactor=True):
         ps: power spectra with noises Nl added
     """
     ells = ps[:,0]
-    
+
     # calculate noise spectra
     Nls = N_l(ells, power_noise, beam_size, prefactor=False)
 
@@ -138,7 +138,7 @@ def add_noise_nl(ps, power_noise, beam_size, l_min, l_max, prefactor=True):
         new_ps = add_prefactor(new_ps)
 
     mask = np.logical_and(ells>=l_min, ells<=l_max)
-    
+
     return new_ps[mask,:]
 
 def _decompose_ps(ps):
@@ -147,7 +147,7 @@ def _decompose_ps(ps):
 
 def gen_ps_realization(ps, prefactor=True):
     """Generate a random power spectra realization
-    
+
     Args:
         ps: power spectra
         prefactor: true if ps is Dl
@@ -170,15 +170,25 @@ def gen_ps_realization(ps, prefactor=True):
     # minutes to run! Note that we start from l=2 because l=0,1
     # are 0 for convenience
     for i, l in enumerate(ells.astype('int')):
-        # a faster version
+        # generate gaussian random complex numbers with unit variance
         zeta1 = np.random.normal(0, 1, 2*l+1)*np.exp(1j*np.random.uniform(0, 2*np.pi, 2*l+1))
         zeta2 = np.random.normal(0, 1, 2*l+1)*np.exp(1j*np.random.uniform(0, 2*np.pi, 2*l+1))
         zeta3 = np.random.normal(0, 1, 2*l+1)*np.exp(1j*np.random.uniform(0, 2*np.pi, 2*l+1))
+
+        # for m=0, zeta has to be real
+        zeta1[l] = np.abs(zeta1[l])
+        zeta2[l] = np.abs(zeta2[l])
+        zeta3[l] = np.abs(zeta3[l])
 
         # generate alm
         aTlm = zeta1 * ClTT[i]**0.5
         aElm = zeta1 * ClTE[i] / (ClTT[i])**0.5 + zeta2*(ClEE[i] - ClTE[i]**2/ClTT[i])**0.5
         aBlm = zeta3 * ClBB[i]**0.5
+
+        # a_{l,-m} = (-1)^m a_{lm}^*
+        aTlm[:l] = np.flip((-1)**np.arange(1,l+1)*np.conj(aTlm[l+1:]))
+        aElm[:l] = np.flip((-1)**np.arange(1,l+1)*np.conj(aElm[l+1:]))
+        aBlm[:l] = np.flip((-1)**np.arange(1,l+1)*np.conj(aBlm[l+1:]))
 
         i_ClTT = np.sum(1.0 * np.abs(aTlm)**2 / (2*l+1))
         i_ClEE = np.sum(1.0 * np.abs(aElm)**2 / (2*l+1))
@@ -215,7 +225,7 @@ def covmat(ps, pixel_noise, beam_size, l_min,
     # beam size
     if prefactor:
         remove_prefactor(ps)
-        
+
     _ells = ps[:, 0]
 
     Wb = lambda l: np.exp(l*(l+1)*beam_size**2/(8.*np.log(2)))
@@ -241,27 +251,27 @@ def covmat(ps, pixel_noise, beam_size, l_min,
     cov = np.zeros([n_ells, 4, 4])
 
     for (i, l) in enumerate(ells):
-        # T, T 
+        # T, T
         cov[i,0,0] = 2.0/(2*l+1)*(ClTT[i] + wTinv*Wb(l))**2
 
-        # E, E 
-        cov[i,1,1] = 2.0/(2*l+1)*(ClEE[i] + wPinv*Wb(l))**2 
+        # E, E
+        cov[i,1,1] = 2.0/(2*l+1)*(ClEE[i] + wPinv*Wb(l))**2
 
-        # B, B 
-        cov[i,2,2] = 2.0/(2*l+1)*(ClBB[i] + wPinv*Wb(l))**2 
+        # B, B
+        cov[i,2,2] = 2.0/(2*l+1)*(ClBB[i] + wPinv*Wb(l))**2
 
-        # TE, TE 
+        # TE, TE
         cov[i,3,3] = 1.0/(2*l+1)*(ClTE[i]**2 + (ClTT[i] + wTinv*Wb(l))
                                   *(ClEE[i] + wPinv*Wb(l)))
 
-        # T, E 
+        # T, E
         cov[i,0,1] = cov[i,1,0] = 2.0/(2*l+1)*ClTE[i]**2
 
         # T, TE
         cov[i,0,3] = cov[i,3,0] = 2.0/(2*l+1)*ClTE[i]*(ClTT[i] +
                                                        wTinv*Wb(l))
 
-        # E, TE 
+        # E, TE
         cov[i,1,3] = cov[i,3,1] = 2.0/(2*l+1)*ClTE[i]*(ClEE[i] +
                                                        wPinv*Wb(l))
 
@@ -275,9 +285,9 @@ def covmat(ps, pixel_noise, beam_size, l_min,
 
 
 def fisher_matrix(model, cov, ratio=0.01):
-    """Estimate the fisher matrix near the model provided. 
+    """Estimate the fisher matrix near the model provided.
 
-    Args: 
+    Args:
         model: a python dictionary that contains the cosmological
         parameters that one is interested in estimating the fisher
         matrix between them (fiducial model)
@@ -285,10 +295,10 @@ def fisher_matrix(model, cov, ratio=0.01):
         cov: the covariance matrix between the power spectra
 
         ratio: the ratio of the parameter to vary. This is because fisher
-        matrix calculation involves differenciating the power spectra 
+        matrix calculation involves differenciating the power spectra
         with respect to the parameters given. To estimate the derivatives
         one needs a small variation near the best fit value. This ratio
-        characterize how much variation is needed. 
+        characterize how much variation is needed.
 
     Returns:
         alpha: fisher matrix
@@ -310,7 +320,7 @@ def fisher_matrix(model, cov, ratio=0.01):
         new_model_p1 = model.copy()
         new_model_p2 = model.copy()
 
-        # step size 
+        # step size
         h = model[p]*ratio
 
         new_model_m2[p] = model[p] - h
@@ -339,7 +349,7 @@ def fisher_matrix(model, cov, ratio=0.01):
         dCldp.append(np.vstack([dClTTdp, dClEEdp, dClBBdp, dClTEdp]))
 
     # now that the derivatives are calculated, we are ready to calculate the
-    # fisher matrix alpha. 
+    # fisher matrix alpha.
     # TODO: This calculation can perhaps be optimized
     alpha = np.zeros([n_params, n_params])
     n_ell = cov.shape[0]
@@ -349,4 +359,3 @@ def fisher_matrix(model, cov, ratio=0.01):
                 alpha[i,j] += np.einsum('i,ij,j', dCldp[i][:,l], np.linalg.inv(cov[l,:,:]), dCldp[j][:,l])
 
     return alpha, params
-
