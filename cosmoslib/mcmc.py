@@ -10,7 +10,7 @@ from cosmoslib.ps import Dl2Cl, resample
 class MCMC(object):
 
     def __init__(self, ps_data=None, N_l=None, n_walkers=2, f_sky=1.,
-                 initial_delta=0.01, save_samples=100, checkpoint_file=None):
+                 initial_delta=0.01, backend_file=None):
         self.f_sky = f_sky
         self.ps_data = ps_data
         self.N_l = N_l
@@ -21,9 +21,7 @@ class MCMC(object):
         self.base_params = {}
         self.fit_params = {}
         self.fit_keys = []
-        self.save_samples = save_samples
-        self._counter = 0
-        self.checkpoint_file = checkpoint_file
+        self.backend_file = backend_file
 
     def set_params(self, params):
         """This method assigns parameters to the MCMC algorithm"""
@@ -134,19 +132,7 @@ class MCMC(object):
 
         return results, False
 
-    def checkpoint(self):
-        # np.save(self.checkpoint_file, self.sampler.chain)
-        # test saving the object
-        print("Checkpointing...")
-        # pickle.dump(self, open(self.checkpoint_file, "wb"))
-        pickle.dump(self, open(self.checkpoint_file, "wb"))
-
     def lnprob(self, theta):
-        # update counter
-        self._counter += 1
-        if self._counter % self.save_samples == 0:
-            self.checkpoint()
-
         ps_theory, err = self.generate_theory(theta)
         # if there is an error, reject this data point
         if err:
@@ -191,18 +177,22 @@ class MCMC(object):
             print("Warning: n_walkers too small, use %d instead..." \
                   % self.n_walkers)
 
-        if not pos0:
-            if not resume:
-                pos0 = self.generate_initial_pos()
-            else:
-                print("Resuming from checkpoint file...")
-                pos0 = self.get_initial_pos_from_ckp()
+        # load backends
+        backend = emcee.backends.HDFBackend(self.backend_file)
+
+        if resume:
+            print("Initial number of steps: {0}".format(backend.iteration))
+            # retrieve final position of chains
+            samples = backend.get_chain()
+            pos0 = samples.T[:,:,-1].T
+        else:
+            backend.reset(self.n_walkers, ndim)
+            pos0 = self.generate_initial_pos()
 
         # check if n_walker satisfy the requirement that it
         # has to be even and more than 2*ndim
-
         sampler = emcee.EnsembleSampler(self.n_walkers, ndim,
-                                        self.lnprob)
+                                        self.lnprob, backend=backend)
         self.sampler = sampler
         sampler.run_mcmc(pos0, N)
 
@@ -220,15 +210,6 @@ class MCMC(object):
             pos0.append(pos)
 
         return pos0
-
-    def get_initial_pos_from_ckp(self):
-        """Get the initial position from an unfinished chain"""
-        with open(self.checkpoint_file, "rb") as f:
-            data = pickle.load(f)
-        n_existing = data.sampler.iterations-1
-        initial_pos = data.sampler.chain[:,n_existing-1,:]
-        del data
-        return initial_pos
 
     def reset_params(self):
         self.base_params = {}
@@ -254,4 +235,3 @@ class MCMC(object):
 
         cosmology.set_model_params(bf_params)
         return cosmology
-

@@ -57,7 +57,7 @@ class IniLine(object):
             return IniLine.format_value([value])
         return ' '.join([str(x) for x in value])
 
-        
+
 class IniFile(object):
     def __init__(self):
         self.lines = []
@@ -242,9 +242,9 @@ class CambSession:
                  ('EE', data[2]),
                  ('BB', data[3]),
                  ('TE', data[4])]
-        
-        return CambResult(stuff)    
-    
+
+        return CambResult(stuff)
+
     def load_tensorCls(self):
         mp = self.get_output_filename('tensCls.dat')
         data = np.loadtxt(mp, unpack=1)
@@ -253,7 +253,7 @@ class CambSession:
                  ('EE', data[2]),
                  ('BB', data[3]),
                  ('TE', data[4])]
-        
+
         return CambResult(stuff)
 
     def load_lensedCls(self):
