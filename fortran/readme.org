@@ -1,4 +1,0 @@
-* Collection of useful scripts borrowed from elsewhere
-
-- utils from cmblensplus by toshiya
-- constants taken from camb
