@@ -158,7 +158,7 @@ class MCMC(object):
         """Set the data power spectra"""
         self.ps_data = ps_data
 
-    def run(self, N, pos0=None, resume=False):
+    def run(self, N, pos0=None, resume=False, **kwargs):
         """Run the mcmc sampler with an ensemble sampler from emcee
 
         Parameters:
@@ -167,7 +167,7 @@ class MCMC(object):
         pos0: initial positions, default to use built-in initial pos0
               generator, but it can be supplied manually
         resume: whether to resume from the checkpoint file
-
+        **kwargs: remaining args will be passed to emcee.sample
         """
         self._counter = 0
         ndim = len(self.fit_keys)
@@ -193,8 +193,9 @@ class MCMC(object):
         # has to be even and more than 2*ndim
         sampler = emcee.EnsembleSampler(self.n_walkers, ndim,
                                         self.lnprob, backend=backend)
-        self.sampler = sampler
-        sampler.run_mcmc(pos0, N)
+        if N > 0:
+            self.sampler = sampler
+            sampler.run_mcmc(pos0, N, **kwargs)
 
         return self.sampler
 
