@@ -53,7 +53,8 @@ class PS:
             raise NotImplementedError("Currently only support PS type ops!")
         # check for ell mismatch
         if np.any(self.ell != other.ell):
-            raise ValueError("ell mismatch!")
+            print("Warning: ells mismatch, interpolating...")
+            return self.resample(other.ell) + other.resample(self.ell)
         # find common specs
         new_order = ['ell'] + [s for s in self.specs if s in other.specs]
         if len(new_order) < 2: raise ValueError("No common specs!")
@@ -104,6 +105,11 @@ class PS:
     def specs(self):
         return [o for o in self.order if o != 'ell']
 
+    @property
+    def values(self):
+        # made sure ell starts from index 0
+        return np.vstack([self.ps[s] for s in ['ell']+self.specs])
+
     def remove_prefactor(self):
         if not self.prefactor: return
         ell = self.ell
@@ -129,9 +135,12 @@ class PS:
         return new_ps
 
     def plot(self, fmt="-", name='C_\ell', axes=None, ncol=2,
-             legend=True, legend_below=True, filename=None, **kwargs):
+             legend=True, legend_below=True, filename=None,
+             prefactor=True, **kwargs):
         """Plot the power spectra"""
         ell = self.ell
+        if prefactor:
+            self.add_prefactor()
 
         if not np.any(axes):
             fig, axes = plt.subplots(2,2,figsize=(12,9))
@@ -156,6 +165,30 @@ class PS:
         if filename:
             plt.savefig(filename, bbox_inches='tight')
         return axes
+
+    def gen_realization(self):
+        """Generate a realization of the power spectra"""
+        # make sure we have everything we want
+        target = ['ell','TT','EE','BB','TE']
+        ok = [s for s in target if s in self.order] == target
+        if not ok:
+            raise ValueError("PS does not contain all of ell,TT,EE,BB,TE required")
+        data = np.hstack([self.ps[s].reshape(-1,1) for s in target])
+        rdata = gen_ps_realization(data, self.prefactor)
+        new_ps = PS(order=target, prefactor=self.prefactor)
+        for i,s in enumerate(target): new_ps.ps[i] = rdata[:,i]
+        return new_ps
+
+
+class SimpleNoise(PS):
+    def __init__(self, noise, fwhm, lmax, prefactor=True):
+        self.order = ('ell','TT','EE','BB','TE')
+        self.prefactor = prefactor
+        ell = np.arange(lmax+1)
+        NlTT = noise**2*np.exp(ell*(ell+1)*beam_size**2/(8.*np.log(2)))
+        NlPP = 2*NlTT
+        self.ps = {'ell': ell, 'TT': NlTT, 'EE': NlPP,
+                   'BB': NlPP, 'TE': np.zeros_like(ell)}
 
 
 def _check_ps(ps):
