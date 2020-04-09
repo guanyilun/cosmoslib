@@ -38,54 +38,53 @@ class ExactLikelihood:
         like = -0.5*chi2
 
 
-    @staticmethod
-    def exact_likelihood(ps_theory, ps_data, nl, f_sky=1., prefactor=True):
-        """Calculate the exact likelihood based on the T, E, B, TE power
-        spectra.
+def exact_likelihood(ps_theory, ps_data, nl, f_sky=1., prefactor=True):
+    """Calculate the exact likelihood based on the T, E, B, TE power
+    spectra.
 
-        Parameters:
-        ------------
-        ps_theory: theory power spectra
-        ps_data: data power spectra
-        nl: noise spectra
-        f_sky: fraction of sky covered. This is added as an effective
-               reduction in the dof in chi-square calculation, default
-               to 1.
-        prefactor: boolean. True if Dls are provided, otherwise False.
+    Parameters:
+    ------------
+    ps_theory: theory power spectra
+    ps_data: data power spectra
+    nl: noise spectra
+    f_sky: fraction of sky covered. This is added as an effective
+           reduction in the dof in chi-square calculation, default
+           to 1.
+    prefactor: boolean. True if Dls are provided, otherwise False.
 
-        Return:
-        --------
-        log-likelihood: float
+    Return:
+    --------
+    log-likelihood: float
 
-        """
+    """
 
-        ell = ps_data[:, 0]
+    ell = ps_data[:, 0]
 
-        # resample the theory curves to match the observation
-        ps_resample = resample(ps_theory, ell)
+    # resample the theory curves to match the observation
+    ps_resample = resample(ps_theory, ell)
 
-        if prefactor:
-            ps_resample = Dl2Cl(ps_resample)
-            ps_data = Dl2Cl(ps_data)
-            nl = Dl2Cl(nl)
+    if prefactor:
+        ps_resample = Dl2Cl(ps_resample)
+        ps_data = Dl2Cl(ps_data)
+        nl = Dl2Cl(nl)
 
-        cls = ps_resample[:, 1:] + nl[:, 1:]
-        dls = ps_data[:, 1:]
+    cls = ps_resample[:, 1:] + nl[:, 1:]
+    dls = ps_data[:, 1:]
 
-        chi2 = 0
-        for i, l in enumerate(ell):
-            cl = cls[i, :]   # cl theory
-            dl = dls[i, :]  # cl data
+    chi2 = 0
+    for i, l in enumerate(ell):
+        cl = cls[i, :]   # cl theory
+        dl = dls[i, :]  # cl data
 
-            # T, E
-            det = cl[0]*cl[1]-cl[3]**2
-            dof = f_sky*(2*l+1)
+        # T, E
+        det = cl[0]*cl[1]-cl[3]**2
+        dof = f_sky*(2*l+1)
 
-            chi2 += dof*(1./det*(dl[0]*cl[1]-2*dl[3]*cl[3]+dl[1]*cl[0])+\
-                         np.log(det/(dl[0]*dl[1]-dl[3]**2))-2)
-            # B
-            chi2 += dof*(1./cl[2]*dl[2]+np.log(cl[2]/dl[2])-1)
+        chi2 += dof*(1./det*(dl[0]*cl[1]-2*dl[3]*cl[3]+dl[1]*cl[0])+\
+                     np.log(det/(dl[0]*dl[1]-dl[3]**2))-2)
+        # B
+        chi2 += dof*(1./cl[2]*dl[2]+np.log(cl[2]/dl[2])-1)
 
-        like = -0.5*chi2
+    like = -0.5*chi2
 
-        return like
+    return like
