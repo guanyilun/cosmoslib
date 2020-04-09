@@ -8,6 +8,156 @@ import numpy as np
 from . import cambex
 import scipy
 
+
+class PS:
+    """A container for CMB power spectrum"""
+    def __init__(self, arg=None, order=('ell','TT','EE','BB','TE'), prefactor=True):
+        """Simple power spectrum data wrapper
+
+        Args:
+            arg (str or ndarray): input data, can be a string to a file to load or
+                an np.ndarray that contains the power spectrum. The array has to have
+                a shape like [n_ell, n_spec].
+            order (tuple(str)): order of columns in the input ps. Follow the naming
+                convention like ell,TT,EE,BB,TE which is default
+            prefactor (bool): whether input array has l(l+1)/2\pi prefactor included
+        """
+        # we will store power spectrum in a dictionary
+        self.ps = {}
+        self.prefactor=prefactor
+        self.order=order
+        # populate ps depending on the inputs
+        if type(arg) == str:
+            self.load_file(arg, order, prefactor)
+        elif type(arg) == np.ndarray:
+            self.load_arr(arg, order, prefactor)
+
+    def load_arr(self, arr, order=('ell','TT','EE','BB','TE'), prefactor=True):
+        """Load data from a given array"""
+        if arg.shape[-1] != len(order):
+            raise ValueError("provided order doesn't match the input array!")
+        for i,c in enumerate(self.order):
+            self.ps[c] = arr[:,i]
+        # now populate fields
+        self.prefactor = prefactor
+        self.order = order
+        self._parse_info()
+
+    def load_file(self, infile, order=('ell','TT','EE','BB','TE'), prefactor=True):
+        """load ps from a given file, will be read using np.readtxt"""
+        data = np.loadtxt(infile)
+        self.load_arr(data, order, prefactor)
+
+    def __add__(self, other):
+        if type(other) != PS:
+            raise NotImplementedError("Currently only support PS type ops!")
+        # check for ell mismatch
+        if np.any(self.ell != other.ell):
+            raise ValueError("ell mismatch!")
+        # find common specs
+        new_order = ['ell'] + [s for s in self.specs if s in other.specs]
+        if len(new_order) < 2: raise ValueError("No common specs!")
+        if self.prefactor != other.prefactor:
+            # if prefactor mismatch, add prefactor to both of them
+            self.add_prefactor()
+            other.add_prefactor()
+        new_ps = PS(order=new_order)
+        for s in new_ps.specs:
+            new_ps.ps[s] = self.ps[s] + other.ps[s]
+        return new_ps
+
+    def __sub__(self, other):
+        if type(other) != PS:
+            raise NotImplementedError("Currently only support PS type ops!")
+        # check for ell mismatch
+        if np.any(self.ell != other.ell):
+            raise ValueError("ell mismatch!")
+        # find common specs
+        new_order = ['ell'] + [s for s in self.specs if s in other.specs]
+        if len(new_order) < 2: raise ValueError("No common specs!")
+        if self.prefactor != other.prefactor:
+            # if prefactor mismatch, add prefactor to both of them
+            self.add_prefactor()
+            other.add_prefactor()
+        new_ps = PS(order=new_order)
+        for s in new_ps.specs:
+            new_ps.ps[s] = self.ps[s] - other.ps[s]
+        return new_ps
+
+    @classmethod
+    def from_arr(cls, arr, order=('ell','TT','EE','BB','TE'), prefactor=True):
+        return PS(arr, order, prefactor)
+
+    @property
+    def lmin(self):
+        return self.ps['ell'].min()
+
+    @property
+    def lmax(self):
+        return self.ps['ell'].max()
+
+    @property
+    def ell(self):
+        return self.ps['ell']
+
+    @property
+    def specs(self):
+        return [o for o in self.order if o != 'ell']
+
+    def remove_prefactor(self):
+        if not self.prefactor: return
+        ell = self.ell
+        for c in enumerate(self.specs):
+            self.ps[c] *= (ell+1)*ell/(2*np.pi)
+        self.prefactor = False
+
+    def add_prefactor(self):
+        if self.prefactor: return
+        ell = self.ell
+        for c in enumerate(self.specs):
+            self.ps[c] *= 2*np.pi/(ell*(ell+1))
+        self.prefactor = True
+
+    def resample(self, new_ell):
+        ell = self.ell
+        # make sure we are within interpolation range
+        m = np.logical_and(new_ell<=self.lmax,new_ell>=self.lmin)
+        # create a new ps object
+        new_ps = PS(order=self.order)
+        for s in self.specs:
+            new_ps.ps[s] = scipy.interpolate.interp1d(ell,self.ps[s])(new_ell[m])
+        return new_ps
+
+    def plot(self, fmt="-", name='C_\ell', axes=None, ncol=2,
+             legend=True, legend_below=True, filename=None, **kwargs):
+        """Plot the power spectra"""
+        ell = self.ell
+
+        if not np.any(axes):
+            fig, axes = plt.subplots(2,2,figsize=(12,9))
+
+        for i,s in enumerate(self.specs):
+            spec = self.ps[s]
+            ax = axes[i//ncol,i%ncol]
+            if self.prefactor:
+                spec_name = r'$\ell(\ell+1)%s^{\rm %s}/2\pi$' % (name, s)
+            else:
+                spec_name = r'$%s^{\rm %s}$' % (name, s)
+            if np.any(self.ps[s] < 0):
+                spec = np.abs(spec)
+            ax.loglog(ell, spec, fmt, **kwargs)
+            ax.set_xlabel(r'$\ell$')
+            ax.set_ylabel(spec_name)
+            if legend and not legend_below:
+                ax.legend()
+        plt.tight_layout()
+        if legend and legend_below:
+            ax.legend(ncol=4, bbox_to_anchor=(0.6, -0.2), frameon=False)
+        if filename:
+            plt.savefig(filename, bbox_inches='tight')
+        return axes
+
+
 def _check_ps(ps):
     """Check the type of power spectra"""
     # if ps is a 2D array
