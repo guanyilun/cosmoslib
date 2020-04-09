@@ -359,3 +359,82 @@ def fisher_matrix(model, cov, ratio=0.01):
                 alpha[i,j] += np.einsum('i,ij,j', dCldp[i][:,l], np.linalg.inv(cov[l,:,:]), dCldp[j][:,l])
 
     return alpha, params
+
+# utility functions
+def substract_ps(ps1, ps2):
+    if ps1.shape[-1] != ps2.shape[-1]:
+        raise "Power spectra shape mismatch"
+    else:
+        ps1_lmin = ps1[0][0]
+        ps2_lmin = ps2[0][0]
+        lmin = max(ps1_lmin, ps2_lmin)
+        ps1_lmax = ps1[-1][0]
+        ps2_lmax = ps2[-1][0]
+        lmax = min(ps1_lmax, ps2_lmax)
+        ps1_mask = np.logical_and(ps1[:,0] >= lmin, ps1[:,0] <= lmax)
+        ps1_match = ps1[ps1_mask,:]
+        ps2_mask = np.logical_and(ps2[:,0] >= lmin, ps2[:,0] <= lmax)
+        ps2_match = ps2[ps2_mask,:]
+        ps1_match[:,1:] -= ps2_match[:,1:]
+        return ps1_match
+
+def divide_ps(ps1, ps2):
+    if ps1.shape[-1] != ps2.shape[-1]:
+        raise "Power spectra shape mismatch"
+    else:
+        ps1_lmin = ps1[0][0]
+        ps2_lmin = ps2[0][0]
+        lmin = max(ps1_lmin, ps2_lmin)
+        ps1_lmax = ps1[-1][0]
+        ps2_lmax = ps2[-1][0]
+        lmax = min(ps1_lmax, ps2_lmax)
+        ps1_mask = np.logical_and(ps1[:,0] >= lmin, ps1[:,0] <= lmax)
+        ps1_match = ps1[ps1_mask,:]
+        ps2_mask = np.logical_and(ps2[:,0] >= lmin, ps2[:,0] <= lmax)
+        ps2_match = ps2[ps2_mask,:]
+        ps1_match[:,1:] /= ps2_match[:,1:]
+        return ps1_match
+
+def add_ps(ps1, ps2):
+    if ps1.shape[-1] != ps2.shape[-1]:
+        raise "Power spectra shape mismatch"
+    else:
+        ps1_lmin = ps1[0][0]
+        ps2_lmin = ps2[0][0]
+        lmin = max(ps1_lmin, ps2_lmin)
+        ps1_lmax = ps1[-1][0]
+        ps2_lmax = ps2[-1][0]
+        lmax = min(ps1_lmax, ps2_lmax)
+        ps1_mask = np.logical_and(ps1[:,0] >= lmin, ps1[:,0] <= lmax)
+        ps1_match = ps1[ps1_mask,:]
+        ps2_mask = np.logical_and(ps2[:,0] >= lmin, ps2[:,0] <= lmax)
+        ps2_match = ps2[ps2_mask,:]
+        ps1_match[:,1:] += ps2_match[:,1:]
+        return ps1_match
+
+def multiply_ps(ps1, ps2):
+    if ps1.shape[-1] != ps2.shape[-1]:
+        raise "Power spectra shape mismatch"
+    else:
+        ps1_lmin = ps1[0][0]
+        ps2_lmin = ps2[0][0]
+        lmin = max(ps1_lmin, ps2_lmin)
+        ps1_lmax = ps1[-1][0]
+        ps2_lmax = ps2[-1][0]
+        lmax = min(ps1_lmax, ps2_lmax)
+        ps1_mask = np.logical_and(ps1[:,0] >= lmin, ps1[:,0] <= lmax)
+        ps1_match = ps1[ps1_mask,:]
+        ps2_mask = np.logical_and(ps2[:,0] >= lmin, ps2[:,0] <= lmax)
+        ps2_match = ps2[ps2_mask,:]
+        ps1_match[:,1:] *= ps2_match[:,1:]
+        return ps1_match
+
+def power_ps(ps, n):
+    ps_new = ps.copy()
+    ps_new[:,1:] = ps_new[:,1:]**n
+    return ps_new
+
+def multiply_ps_num(ps, n):
+    ps_new = ps.copy()
+    ps_new[:,1:] = ps_new[:,1:]*n
+    return ps_new
