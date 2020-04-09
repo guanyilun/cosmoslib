@@ -22,6 +22,7 @@ class MCMC(object):
         self.fit_params = {}
         self.fit_keys = []
         self.backend_file = backend_file
+        self.likelihoods = []
 
     def set_params(self, params):
         """This method assigns parameters to the MCMC algorithm"""
@@ -55,6 +56,12 @@ class MCMC(object):
             elif p > upper:
                 return -np.inf
         return 0.
+
+    def add_likelihood(self, likelihood):
+        """Add a likelihood calculator
+
+        """
+        self.likelihoods.append(likelihood)
 
     @staticmethod
     def exact_likelihood(ps_theory, ps_data, nl, f_sky=1., prefactor=True):
@@ -141,6 +148,9 @@ class MCMC(object):
         # now i trust that there is no error
         prior = self.lnprior(theta)
         if np.isfinite(prior):
+            for like_mod in self.likelihoods:
+                like += like_mod(ps_theory)
+
             like = MCMC.exact_likelihood(ps_theory, self.ps_data,
                                          self.N_l, self.f_sky)
             print("Parameter: %s\t loglike: %.2f" % (theta, like))
