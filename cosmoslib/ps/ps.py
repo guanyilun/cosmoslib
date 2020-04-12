@@ -5,11 +5,12 @@ with camb, power spectrum and covariance matrix
 """
 
 import numpy as np
-import scipy
+from scipy import interpolate
+from cosmoslib.ps import covmat
 
 
 class PS:
-    """A container for CMB power spectrum"""
+    """A container for CMB power spectrum."""
     def __init__(self, arg=None, order=('ell','TT','EE','BB','TE'), prefactor=True):
         """Simple power spectrum data wrapper
 
@@ -22,6 +23,12 @@ class PS:
             prefactor (bool): whether input array has l(l+1)/2\pi prefactor included
         """
         # we will store power spectrum in a dictionary
+        # we will keep two versions to save unnecessary conversions
+        # True means prefactored and False means unprefactored
+        # self._ps = {
+        #     True: {},
+        #     False: {}
+        # }
         self.ps = {}
         self.prefactor=prefactor
         self.order=order
@@ -31,24 +38,31 @@ class PS:
         elif type(arg) == np.ndarray:
             self.load_arr(arg, order, prefactor)
 
+    # @property
+    # def ps(self):
+    #     return self._ps[self.prefactor]
+
     def load_arr(self, arr, order=('ell','TT','EE','BB','TE'), prefactor=True):
         """Load data from a given array"""
-        if arg.shape[-1] != len(order):
+        if arr.shape[-1] != len(order):
             raise ValueError("provided order doesn't match the input array!")
-        for i,c in enumerate(self.order):
-            self.ps[c] = arr[:,i]
         # now populate fields
         self.prefactor = prefactor
+        for i,c in enumerate(self.order):
+            self.ps[c] = arr[:,i]
         self.order = order
-        self._parse_info()
 
     def load_file(self, infile, order=('ell','TT','EE','BB','TE'), prefactor=True):
         """load ps from a given file, will be read using np.readtxt"""
         data = np.loadtxt(infile)
         self.load_arr(data, order, prefactor)
 
+    def __repr__(self):
+        order = str(self.order).replace(' ','')
+        return f"PS(lmin={int(self.lmin)},lmax={int(self.lmax)},prefactor={self.prefactor},order={order})"
+
     def __add__(self, other):
-        if type(other) != PS:
+        if not issubclass(type(other), PS):
             raise NotImplementedError("Currently only support PS type ops!")
         # check for ell mismatch
         if np.any(self.ell != other.ell):
@@ -62,12 +76,14 @@ class PS:
             self.add_prefactor()
             other.add_prefactor()
         new_ps = PS(order=new_order)
+        assert np.all(self.ell == other.ell)
+        new_ps.ps['ell'] = self.ell
         for s in new_ps.specs:
             new_ps.ps[s] = self.ps[s] + other.ps[s]
         return new_ps
 
     def __sub__(self, other):
-        if type(other) != PS:
+        if not issubclass(type(other), PS):
             raise NotImplementedError("Currently only support PS type ops!")
         # check for ell mismatch
         if np.any(self.ell != other.ell):
@@ -137,14 +153,16 @@ class PS:
         m = np.logical_and(new_ell<=self.lmax,new_ell>=self.lmin)
         # create a new ps object
         new_ps = PS(order=self.order)
+        new_ps.ps['ell'] = new_ell[m]
         for s in self.specs:
-            new_ps.ps[s] = scipy.interpolate.interp1d(ell,self.ps[s])(new_ell[m])
+            new_ps.ps[s] = interpolate.interp1d(ell,self.ps[s])(new_ell[m])
         return new_ps
 
     def plot(self, fmt="-", name='C_\ell', axes=None, ncol=2,
              legend=True, legend_below=True, filename=None,
              prefactor=True, **kwargs):
         """Plot the power spectra"""
+        import matplotlib.pyplot as plt
         ell = self.ell
         if prefactor:
             self.add_prefactor()
@@ -183,20 +201,25 @@ class PS:
         data = np.hstack([self.ps[s].reshape(-1,1) for s in target])
         rdata = gen_ps_realization(data, self.prefactor)
         new_ps = PS(order=target, prefactor=self.prefactor)
-        for i,s in enumerate(target): new_ps.ps[i] = rdata[:,i]
+        for i,s in enumerate(target): new_ps.ps[s] = rdata[:,i]
         return new_ps
 
+    def covmat(self, noise, f_sky):
+        """get covariance matrix given a noise model"""
+        return covmat(self.values, noise.nlev, noise.fwhm, noise.lmin,
+                      noise.lmax, f_sky, prefactor=self.prefactor)
 
 class SimpleNoise(PS):
-    def __init__(self, noise, fwhm, lmax, prefactor=True):
+    def __init__(self, nlev, fwhm, lmin, lmax, prefactor=True):
         self.order = ('ell','TT','EE','BB','TE')
         self.prefactor = prefactor
-        ell = np.arange(lmax+1)
-        NlTT = noise**2*np.exp(ell*(ell+1)*beam_size**2/(8.*np.log(2)))
+        self.nlev = nlev
+        self.fwhm = fwhm
+        ell = np.arange(lmin, lmax+1)
+        NlTT = nlev**2*np.exp(ell*(ell+1)*fwhm**2/(8.*np.log(2)))
         NlPP = 2*NlTT
         self.ps = {'ell': ell, 'TT': NlTT, 'EE': NlPP,
                    'BB': NlPP, 'TE': np.zeros_like(ell)}
-
 
 def _check_ps(ps):
     """Check the type of power spectra"""
@@ -238,10 +261,10 @@ def resample(ps, ell):
     bb_old = ps[:, 3]
     te_old = ps[:, 4]
 
-    tt_predicted = scipy.interpolate.interp1d(ell_old, tt_old)(ell)
-    te_predicted = scipy.interpolate.interp1d(ell_old, te_old)(ell)
-    ee_predicted = scipy.interpolate.interp1d(ell_old, ee_old)(ell)
-    bb_predicted = scipy.interpolate.interp1d(ell_old, bb_old)(ell)
+    tt_predicted = interpolate.interp1d(ell_old, tt_old)(ell)
+    te_predicted = interpolate.interp1d(ell_old, te_old)(ell)
+    ee_predicted = interpolate.interp1d(ell_old, ee_old)(ell)
+    bb_predicted = interpolate.interp1d(ell_old, bb_old)(ell)
 
     cl_predicted = np.stack([ell, tt_predicted, ee_predicted, bb_predicted, te_predicted], axis=1)
 
@@ -386,8 +409,7 @@ def gen_ps_realization(ps, prefactor=True):
     else:
         return m_ps
 
-
-def covmat(ps, pixel_noise, beam_size, l_min,
+def covmat_slow(ps, pixel_noise, beam_size, l_min,
            l_max, f_sky, prefactor=True):
     """Calculate the covariance matrix based on a model.
 
