@@ -6,6 +6,9 @@ cimport cython
 cimport numpy as np
 from libc.math cimport exp, log
 
+cdef extern from "complex.h":
+    double creal(complex arg)
+    double cimag(complex arg)
 
 cdef double Wb(double l, double fwhm) nogil:
     return exp(l*(l+1)*fwhm**2/(8*log(2)))
@@ -81,3 +84,66 @@ def covmat(np.ndarray[np.float64_t, ndim=2] ps, double noise, double fwhm, int l
     cov /= f_sky
 
     return ells, cov
+
+
+def gen_ps_realization(np.ndarray[np.float64_t, ndim=2] ps, int prefactor=True):
+    """Generate a random power spectra realization
+
+    Args:
+        ps: power spectra
+        prefactor: true if ps is Dl
+
+    Returns:
+        ps realization: consistent with prefactor choice
+    """
+    cdef int i, l
+    cdef double[:,::1] m_ps = np.zeros_like(ps)
+    cdef np.ndarray[np.complex128_t, ndim=1] zeta1, zeta2, zeta3
+    cdef double i_ClTT, i_ClEE, i_ClBB, i_ClTE
+    cdef double[::] ells, ClTT, ClEE, ClBB, ClTE
+    cdef np.ndarray[np.complex128_t, ndim=1] aTlm, aElm, aBlm
+    # first make a copy to make sure we don't affect the original
+    if prefactor:
+        ps = Dl2Cl(ps, inplace=False)
+    ells, ClTT, ClEE, ClBB, ClTE = ps[:,0], ps[:,1], ps[:,2], ps[:,3], ps[:,4]
+
+    # define empty arrays to hold the generated power spectra
+    m_ps[:,0] = ells
+
+    # this is certainly slow, but i don't need to run this very often
+    # so it's fine to leave it like this. in principle i don't need to
+    # keep all the negative part as well. These can be improved if
+    # performance becomes an issue
+    for i in range(len(ells)):
+        l = int(ells[i])
+
+        # generate gaussian random complex numbers with unit variance
+        zeta1 = np.random.randn(l+1)*np.exp(1j*np.random.rand(l+1)*2*np.pi)
+        zeta2 = np.random.randn(l+1)*np.exp(1j*np.random.rand(l+1)*2*np.pi)
+        zeta3 = np.random.randn(l+1)*np.exp(1j*np.random.rand(l+1)*2*np.pi)
+
+        # for m=0, zeta has to be real
+        zeta1[0] = abs(zeta1[0])
+        zeta2[0] = abs(zeta2[0])
+        zeta3[0] = abs(zeta3[0])
+
+        # generate alm
+        aTlm = zeta1 * ClTT[i]**0.5
+        aElm = zeta1 * ClTE[i] / (ClTT[i])**0.5 + zeta2*(ClEE[i] - ClTE[i]**2/ClTT[i])**0.5
+        aBlm = zeta3 * ClBB[i]**0.5
+
+        i_ClTT = (aTlm[0]**2 + 2*(np.sum(np.abs(aTlm[1:])**2)))/(2*l+1)
+        i_ClEE = (aElm[0]**2 + 2*(np.sum(np.abs(aElm[1:])**2)))/(2*l+1)
+        i_ClBB = (aBlm[0]**2 + 2*(np.sum(np.abs(aBlm[1:])**2)))/(2*l+1)
+        i_ClTE = (aTlm[0]*aElm[0] + 2*(np.sum(np.conj(aTlm[1:])*aElm[1:])))/(2*l+1)
+
+        # assign the new values to the new array
+        m_ps[i,1] = i_ClTT
+        m_ps[i,2] = i_ClEE
+        m_ps[i,3] = i_ClBB
+        m_ps[i,4] = i_ClTE
+
+    if prefactor:
+        return Cl2Dl(m_ps, inplace=True)
+    else:
+        return m_ps

@@ -6,7 +6,6 @@ with camb, power spectrum and covariance matrix
 
 import numpy as np
 from scipy import interpolate
-from cosmoslib.ps import covmat
 
 
 class PS:
@@ -87,7 +86,8 @@ class PS:
             raise NotImplementedError("Currently only support PS type ops!")
         # check for ell mismatch
         if np.any(self.ell != other.ell):
-            raise ValueError("ell mismatch!")
+            print("Warning: ells mismatch, interpolating...")
+            return self.resample(other.ell) - other.resample(self.ell)
         # find common specs
         new_order = ['ell'] + [s for s in self.specs if s in other.specs]
         if len(new_order) < 2: raise ValueError("No common specs!")
@@ -96,6 +96,7 @@ class PS:
             self.add_prefactor()
             other.add_prefactor()
         new_ps = PS(order=new_order)
+        new_ps.ps['ell'] = self.ell
         for s in new_ps.specs:
             new_ps.ps[s] = self.ps[s] - other.ps[s]
         return new_ps
@@ -123,7 +124,7 @@ class PS:
     @property
     def values(self):
         # made sure ell starts from index 0
-        return np.vstack([self.ps[s] for s in self.order])
+        return np.vstack([self.ps[s] for s in self.order]).T
 
     def add_prefactor(self, inplace=True):
         if self.prefactor: return self
@@ -208,6 +209,7 @@ class PS:
         """get covariance matrix given a noise model"""
         return covmat(self.values, noise.nlev, noise.fwhm, noise.lmin,
                       noise.lmax, f_sky, prefactor=self.prefactor)
+
 
 class SimpleNoise(PS):
     def __init__(self, nlev, fwhm, lmin, lmax, prefactor=True):
@@ -379,9 +381,9 @@ def gen_ps_realization(ps, prefactor=True):
         l = int(ells[i])
 
         # generate gaussian random complex numbers with unit variance
-        zeta1 = np.random.randn(l+1)*np.exp(1j*np.random.rand(l+1)*2*np.pi)
-        zeta2 = np.random.randn(l+1)*np.exp(1j*np.random.rand(l+1)*2*np.pi)
-        zeta3 = np.random.randn(l+1)*np.exp(1j*np.random.rand(l+1)*2*np.pi)
+        zeta1 = np.abs(np.random.randn(l+1))*np.exp(1j*np.random.rand(l+1)*2*np.pi)
+        zeta2 = np.abs(np.random.randn(l+1))*np.exp(1j*np.random.rand(l+1)*2*np.pi)
+        zeta3 = np.abs(np.random.randn(l+1))*np.exp(1j*np.random.rand(l+1)*2*np.pi)
 
         # for m=0, zeta has to be real
         zeta1[0] = np.abs(zeta1[0])
@@ -409,7 +411,8 @@ def gen_ps_realization(ps, prefactor=True):
     else:
         return m_ps
 
-def covmat_slow(ps, pixel_noise, beam_size, l_min,
+
+def covmat(ps, pixel_noise, beam_size, l_min,
            l_max, f_sky, prefactor=True):
     """Calculate the covariance matrix based on a model.
 
