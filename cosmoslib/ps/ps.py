@@ -5,7 +5,6 @@ with camb, power spectrum and covariance matrix
 """
 
 import numpy as np
-from . import cambex
 import scipy
 
 
@@ -222,33 +221,6 @@ def remove_prefactor(ps):
         ps[:,i] *= 2*np.pi/(ells*(ells+1))
     return ps
 
-def Dl2Cl_(ps):
-    """Dl to Cl, same as remove_prefactor. Implemented for
-    readability"""
-    return remove_prefactor(ps)
-
-def Cl2Dl_(ps):
-    """Cl to Dl, same as add_prefactor. Implemented for
-    readability"""
-    return add_prefactor(ps)
-
-def Dl2Cl(ps):
-    """Add the l(l+1)/2\pi prefactor in a power spectrum"""
-    # check the dimension of power spectra
-    ells = ps[:, 0]
-    new_ps = ps.copy()
-    for i in range(1,ps.shape[1]):
-        new_ps[:,i] /= 2*np.pi/(ells*(ells+1))
-    return new_ps
-
-def Cl2Dl(ps):
-    """Remove the l(l+1)/2\pi prefactor in a power spectrum"""
-    ells = ps[:, 0]
-    new_ps = ps.copy()
-    for i in range(1,ps.shape[1]):
-        new_ps[:,i] *= 2*np.pi/(ells*(ells+1))
-    return new_ps
-
 def resample(ps, ell):
     ell_old = ps[:, 0]
 
@@ -324,9 +296,30 @@ def add_noise_nl(ps, power_noise, beam_size, l_min, l_max, prefactor=True):
 
     return new_ps[mask,:]
 
-def _decompose_ps(ps):
-    """Decompose ps into individual components"""
-    return ps[:,0], ps[:,1], ps[:,2], ps[:,3], ps[:,4]
+
+def Dl2Cl(ps, inplace=False):
+    """Add the l(l+1)/2\pi prefactor in a power spectrum"""
+    # check the dimension of power spectra
+    ells = ps[:, 0]
+    if not inplace:
+        new_ps = ps.copy()
+    else:
+        new_ps = ps
+    for i in range(1,ps.shape[1]):
+        new_ps[:,i] /= 2*np.pi/(ells*(ells+1))
+    return new_ps
+
+def Cl2Dl(ps, inplace=False):
+    """Remove the l(l+1)/2\pi prefactor in a power spectrum"""
+    ells = ps[:, 0]
+    if not inplace:
+        new_ps = ps.copy()
+    else:
+        new_ps = ps
+    for i in range(1,ps.shape[1]):
+        new_ps[:,i] *= 2*np.pi/(ells*(ells+1))
+    return new_ps
+
 
 def gen_ps_realization(ps, prefactor=True):
     """Generate a random power spectra realization
@@ -339,44 +332,40 @@ def gen_ps_realization(ps, prefactor=True):
         ps realization: consistent with prefactor choice
     """
     # first make a copy to make sure we don't affect the original
-    ps = ps.copy()
     if prefactor:
-        ps = Dl2Cl(ps)
-    ells, ClTT, ClEE, ClBB, ClTE = _decompose_ps(ps)
+        ps = Dl2Cl(ps, inplace=False)
+    ells, ClTT, ClEE, ClBB, ClTE = ps[:,0], ps[:,1], ps[:,2], ps[:,3], ps[:,4]
 
     # define empty arrays to hold the generated power spectra
-    m_ps = ps.copy()
+    m_ps = np.zeros_like(ps)
+    m_ps[:,0] = ells
 
-    # this is certainly slow, but I can use it as a benchmark
-    # to see how much acceleration I can get by changing into
-    # a compiled version. A quick test shows that it takes >5
-    # minutes to run! Note that we start from l=2 because l=0,1
-    # are 0 for convenience
-    for i, l in enumerate(ells.astype('int')):
+    # this is certainly slow, but i don't need to run this very often
+    # so it's fine to leave it like this. in principle i don't need to
+    # keep all the negative part as well. These can be improved if
+    # performance becomes an issue
+    for i in range(len(ells)):
+        l = int(ells[i])
+
         # generate gaussian random complex numbers with unit variance
-        zeta1 = np.random.normal(0, 1, 2*l+1)*np.exp(1j*np.random.uniform(0, 2*np.pi, 2*l+1))
-        zeta2 = np.random.normal(0, 1, 2*l+1)*np.exp(1j*np.random.uniform(0, 2*np.pi, 2*l+1))
-        zeta3 = np.random.normal(0, 1, 2*l+1)*np.exp(1j*np.random.uniform(0, 2*np.pi, 2*l+1))
+        zeta1 = np.random.randn(l+1)*np.exp(1j*np.random.rand(l+1)*2*np.pi)
+        zeta2 = np.random.randn(l+1)*np.exp(1j*np.random.rand(l+1)*2*np.pi)
+        zeta3 = np.random.randn(l+1)*np.exp(1j*np.random.rand(l+1)*2*np.pi)
 
         # for m=0, zeta has to be real
-        zeta1[l] = np.abs(zeta1[l])
-        zeta2[l] = np.abs(zeta2[l])
-        zeta3[l] = np.abs(zeta3[l])
+        zeta1[0] = np.abs(zeta1[0])
+        zeta2[0] = np.abs(zeta2[0])
+        zeta3[0] = np.abs(zeta3[0])
 
         # generate alm
         aTlm = zeta1 * ClTT[i]**0.5
         aElm = zeta1 * ClTE[i] / (ClTT[i])**0.5 + zeta2*(ClEE[i] - ClTE[i]**2/ClTT[i])**0.5
         aBlm = zeta3 * ClBB[i]**0.5
 
-        # a_{l,-m} = (-1)^m a_{lm}^*
-        aTlm[:l] = np.flip((-1)**np.arange(1,l+1)*np.conj(aTlm[l+1:]))
-        aElm[:l] = np.flip((-1)**np.arange(1,l+1)*np.conj(aElm[l+1:]))
-        aBlm[:l] = np.flip((-1)**np.arange(1,l+1)*np.conj(aBlm[l+1:]))
-
-        i_ClTT = np.sum(1.0 * np.abs(aTlm)**2 / (2*l+1))
-        i_ClEE = np.sum(1.0 * np.abs(aElm)**2 / (2*l+1))
-        i_ClBB = np.sum(1.0 * np.abs(aBlm)**2 / (2*l+1))
-        i_ClTE = np.sum(1.0 * np.conj(aTlm)*aElm / (2*l+1))
+        i_ClTT = (aTlm[0]**2 + 2*(np.sum(np.abs(aTlm[1:])**2)))/(2*l+1)
+        i_ClEE = (aElm[0]**2 + 2*(np.sum(np.abs(aElm[1:])**2)))/(2*l+1)
+        i_ClBB = (aBlm[0]**2 + 2*(np.sum(np.abs(aBlm[1:])**2)))/(2*l+1)
+        i_ClTE = (aTlm[0]*aElm[0] + 2*(np.sum(np.conj(aTlm[1:])*aElm[1:])))/(2*l+1)
 
         # assign the new values to the new array
         m_ps[i,1] = i_ClTT
@@ -385,9 +374,10 @@ def gen_ps_realization(ps, prefactor=True):
         m_ps[i,4] = i_ClTE
 
     if prefactor:
-        return Cl2Dl(m_ps)
+        return Cl2Dl(m_ps, inplace=True)
     else:
         return m_ps
+
 
 def covmat(ps, pixel_noise, beam_size, l_min,
            l_max, f_sky, prefactor=True):
@@ -542,6 +532,7 @@ def fisher_matrix(model, cov, ratio=0.01):
                 alpha[i,j] += np.einsum('i,ij,j', dCldp[i][:,l], np.linalg.inv(cov[l,:,:]), dCldp[j][:,l])
 
     return alpha, params
+
 
 # utility functions
 def substract_ps(ps1, ps2):

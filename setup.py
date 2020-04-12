@@ -4,6 +4,9 @@
 """The setup script."""
 
 from setuptools import setup, find_packages
+from distutils.extension import Extension
+from Cython.Build import cythonize
+import numpy as np
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()
@@ -11,11 +14,7 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['numpy', 'scipy', 'matplotlib']
-
-setup_requirements = [ ]
-
-test_requirements = [ ]
+requirements = ['numpy', 'scipy', 'matplotlib', 'cython']
 
 setup(
     author="Yilun Guan",
@@ -34,11 +33,6 @@ setup(
         'Programming Language :: Python :: 3.7',
     ],
     description="Some reusable codes in my cosmology research",
-    entry_points={
-        'console_scripts': [
-            'cosmoslib=cosmoslib.cli:main',
-        ],
-    },
     install_requires=requirements,
     license="MIT license",
     long_description=readme + '\n\n' + history,
@@ -46,10 +40,14 @@ setup(
     keywords='cosmoslib',
     name='cosmoslib',
     packages=find_packages(include=['cosmoslib']),
-    setup_requires=setup_requirements,
-    test_suite='tests',
-    tests_require=test_requirements,
     url='https://github.com/guanyilun/cosmoslib',
     version='0.1.0',
     zip_safe=False,
+    ext_modules=cythonize([
+        Extension(
+            name="cosmoslib.ps._ps",
+            sources=["cosmoslib/ps/_ps.pyx"],
+            include_dirs=[np.get_include()]
+        )
+    ])
 )
