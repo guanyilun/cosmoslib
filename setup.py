@@ -46,8 +46,10 @@ setup(
     ext_modules=cythonize([
         Extension(
             name="cosmoslib.ps._ps",
-            sources=["cosmoslib/ps/_ps.pyx"],
-            include_dirs=[np.get_include()]
+            sources=["cosmoslib/ps/ps.pyx"],
+            include_dirs=[np.get_include()],
+            extra_compile_args=['-fopenmp'],
+            extra_link_args=['-fopenmp'],
         )
     ])
 )

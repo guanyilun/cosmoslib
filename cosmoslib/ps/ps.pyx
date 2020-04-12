@@ -1,9 +1,13 @@
 import numpy as np
 from .ps import Dl2Cl, Cl2Dl
+from cython.parallel import prange
+
+cimport cython
 cimport numpy as np
 from libc.math cimport exp, log
 
-cdef double Wb(double l, double fwhm):
+
+cdef double Wb(double l, double fwhm) nogil:
     return exp(l*(l+1)*fwhm**2/(8*log(2)))
 
 def covmat(np.ndarray[np.float64_t, ndim=2] ps, double noise, double fwhm, int l_min,
@@ -53,25 +57,26 @@ def covmat(np.ndarray[np.float64_t, ndim=2] ps, double noise, double fwhm, int l
     n_ells = len(ells)
     cov = np.zeros([n_ells, 4, 4])
 
-    for i in range(n_ells):
-        l = ells[i]
-        # T, T
-        cov[i,0,0] = 2.0/(2*l+1)*(ClTT[i] + wTinv*Wb(l,fwhm))**2
-        # E, E
-        cov[i,1,1] = 2.0/(2*l+1)*(ClEE[i] + wPinv*Wb(l,fwhm))**2
-        # B, B
-        cov[i,2,2] = 2.0/(2*l+1)*(ClBB[i] + wPinv*Wb(l,fwhm))**2
-        # TE, TE
-        cov[i,3,3] = 1.0/(2*l+1)*(ClTE[i]**2 + (ClTT[i] + wTinv*Wb(l,fwhm))
-                                  *(ClEE[i] + wPinv*Wb(l,fwhm)))
-        # T, E
-        cov[i,0,1] = cov[i,1,0] = 2.0/(2*l+1)*ClTE[i]**2
-        # T, TE
-        cov[i,0,3] = cov[i,3,0] = 2.0/(2*l+1)*ClTE[i]*(ClTT[i] +
-                                                       wTinv*Wb(l,fwhm))
-        # E, TE
-        cov[i,1,3] = cov[i,3,1] = 2.0/(2*l+1)*ClTE[i]*(ClEE[i] +
-                                                       wPinv*Wb(l,fwhm))
+    for i in prange(n_ells, nogil=True):
+        with cython.boundscheck(False):
+            l = ells[i]
+            # T, T
+            cov[i,0,0] = 2.0/(2*l+1)*(ClTT[i] + wTinv*Wb(l,fwhm))**2
+            # E, E
+            cov[i,1,1] = 2.0/(2*l+1)*(ClEE[i] + wPinv*Wb(l,fwhm))**2
+            # B, B
+            cov[i,2,2] = 2.0/(2*l+1)*(ClBB[i] + wPinv*Wb(l,fwhm))**2
+            # TE, TE
+            cov[i,3,3] = 1.0/(2*l+1)*(ClTE[i]**2 + (ClTT[i] + wTinv*Wb(l,fwhm))
+                                      *(ClEE[i] + wPinv*Wb(l,fwhm)))
+            # T, E
+            cov[i,0,1] = cov[i,1,0] = 2.0/(2*l+1)*ClTE[i]**2
+            # T, TE
+            cov[i,0,3] = cov[i,3,0] = 2.0/(2*l+1)*ClTE[i]*(ClTT[i] +
+                                                           wTinv*Wb(l,fwhm))
+            # E, TE
+            cov[i,1,3] = cov[i,3,1] = 2.0/(2*l+1)*ClTE[i]*(ClEE[i] +
+                                                           wPinv*Wb(l,fwhm))
     # now we include the effect of partial sky coverage
     cov /= f_sky
 
