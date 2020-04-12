@@ -86,7 +86,7 @@ class PS:
 
     @classmethod
     def from_arr(cls, arr, order=('ell','TT','EE','BB','TE'), prefactor=True):
-        return PS(arr, order, prefactor)
+        return cls(arr, order, prefactor)
 
     @property
     def lmin(self):
@@ -107,21 +107,29 @@ class PS:
     @property
     def values(self):
         # made sure ell starts from index 0
-        return np.vstack([self.ps[s] for s in ['ell']+self.specs])
+        return np.vstack([self.ps[s] for s in self.order])
 
-    def remove_prefactor(self):
-        if not self.prefactor: return
-        ell = self.ell
-        for c in enumerate(self.specs):
-            self.ps[c] *= (ell+1)*ell/(2*np.pi)
-        self.prefactor = False
+    def add_prefactor(self, inplace=True):
+        if self.prefactor: return self
+        if inplace:
+            ell = self.ell
+            for c in self.specs:
+                self.ps[c] *= (ell+1)*ell/(2*np.pi)
+            self.prefactor = False
+            return self
+        else:
+            return PS(self.values,self.order,prefactor=False).add_prefactor()
 
-    def add_prefactor(self):
-        if self.prefactor: return
-        ell = self.ell
-        for c in enumerate(self.specs):
-            self.ps[c] *= 2*np.pi/(ell*(ell+1))
-        self.prefactor = True
+    def remove_prefactor(self, inplace=True):
+        if not self.prefactor: return self
+        if inplace:
+            ell = self.ell
+            for c in self.specs:
+                self.ps[c] *= 2*np.pi/(ell*(ell+1))
+            self.prefactor = True
+            return self
+        else:
+            return PS(self.values,self.order,prefactor=True).remove_refactor()
 
     def resample(self, new_ell):
         ell = self.ell
