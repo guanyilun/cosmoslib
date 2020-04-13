@@ -10,7 +10,7 @@ from scipy import interpolate
 
 class PS:
     """A container for CMB power spectrum."""
-    def __init__(self, arg=None, order=('ell','TT','EE','BB','TE'), prefactor=True):
+    def __init__(self, arg=None, order=('ell','TT','EE','BB','TE'), prefactor=False):
         """Simple power spectrum data wrapper
 
         Args:
@@ -29,32 +29,33 @@ class PS:
         #     False: {}
         # }
         self.ps = {}
-        self.prefactor=prefactor
         self.order=order
+        self.prefactor=prefactor
         # populate ps depending on the inputs
         if type(arg) == str:
             self.load_file(arg, order, prefactor)
         elif type(arg) == np.ndarray:
             self.load_arr(arg, order, prefactor)
 
-    # @property
-    # def ps(self):
-    #     return self._ps[self.prefactor]
-
     def load_arr(self, arr, order=('ell','TT','EE','BB','TE'), prefactor=True):
         """Load data from a given array"""
         if arr.shape[-1] != len(order):
             raise ValueError("provided order doesn't match the input array!")
         # now populate fields
-        self.prefactor = prefactor
-        for i,c in enumerate(self.order):
-            self.ps[c] = arr[:,i]
         self.order = order
+        for i,c in enumerate(order):
+            self.ps[c] = arr[:,i]
+        # by default keep the unprefactored version
+        self.prefactor = prefactor
+        if prefactor:
+            return self.remove_prefactor()
+        else:
+            return self
 
     def load_file(self, infile, order=('ell','TT','EE','BB','TE'), prefactor=True):
         """load ps from a given file, will be read using np.readtxt"""
         data = np.loadtxt(infile)
-        self.load_arr(data, order, prefactor)
+        return self.load_arr(data, order, prefactor)
 
     def __repr__(self):
         order = str(self.order).replace(' ','')
@@ -72,9 +73,9 @@ class PS:
         if len(new_order) < 2: raise ValueError("No common specs!")
         if self.prefactor != other.prefactor:
             # if prefactor mismatch, add prefactor to both of them
-            self.add_prefactor()
-            other.add_prefactor()
-        new_ps = PS(order=new_order)
+            self.remove_prefactor()
+            other.remove_prefactor()
+        new_ps = PS(order=new_order, prefactor=self.prefactor)
         assert np.all(self.ell == other.ell)
         new_ps.ps['ell'] = self.ell
         for s in new_ps.specs:
@@ -93,9 +94,9 @@ class PS:
         if len(new_order) < 2: raise ValueError("No common specs!")
         if self.prefactor != other.prefactor:
             # if prefactor mismatch, add prefactor to both of them
-            self.add_prefactor()
-            other.add_prefactor()
-        new_ps = PS(order=new_order)
+            self.remove_prefactor()
+            other.remove_prefactor()
+        new_ps = PS(order=new_order, prefactor=self.prefactor)
         new_ps.ps['ell'] = self.ell
         for s in new_ps.specs:
             new_ps.ps[s] = self.ps[s] - other.ps[s]
@@ -132,7 +133,7 @@ class PS:
             ell = self.ell
             for c in self.specs:
                 self.ps[c] *= (ell+1)*ell/(2*np.pi)
-            self.prefactor = False
+            self.prefactor = True
             return self
         else:
             return PS(self.values,self.order,prefactor=False).add_prefactor()
@@ -143,7 +144,7 @@ class PS:
             ell = self.ell
             for c in self.specs:
                 self.ps[c] *= 2*np.pi/(ell*(ell+1))
-            self.prefactor = True
+            self.prefactor = False
             return self
         else:
             return PS(self.values,self.order,prefactor=True).remove_refactor()
@@ -153,7 +154,7 @@ class PS:
         # make sure we are within interpolation range
         m = np.logical_and(new_ell<=self.lmax,new_ell>=self.lmin)
         # create a new ps object
-        new_ps = PS(order=self.order)
+        new_ps = PS(order=self.order,prefactor=self.prefactor)
         new_ps.ps['ell'] = new_ell[m]
         for s in self.specs:
             new_ps.ps[s] = interpolate.interp1d(ell,self.ps[s])(new_ell[m])
@@ -161,28 +162,33 @@ class PS:
 
     def plot(self, fmt="-", name='C_\ell', axes=None, ncol=2,
              legend=True, legend_below=True, filename=None,
-             prefactor=True, **kwargs):
+             prefactor=True, logx=True, logy=True, **kwargs):
         """Plot the power spectra"""
         import matplotlib.pyplot as plt
         ell = self.ell
-        if prefactor:
-            self.add_prefactor()
-
+        nrow = int(np.ceil(len(self.specs)/ncol))
         if not np.any(axes):
-            fig, axes = plt.subplots(2,2,figsize=(12,9))
-
+            fig, axes = plt.subplots(nrow, ncol,figsize=(12,9))
         for i,s in enumerate(self.specs):
             spec = self.ps[s]
             ax = axes[i//ncol,i%ncol]
-            if self.prefactor:
+            if prefactor:
                 spec_name = r'$\ell(\ell+1)%s^{\rm %s}/2\pi$' % (name, s)
             else:
                 spec_name = r'$%s^{\rm %s}$' % (name, s)
             if np.any(self.ps[s] < 0):
                 spec = np.abs(spec)
-            ax.loglog(ell, spec, fmt, **kwargs)
+            if prefactor and not self.prefactor:
+                spec = spec*ell*(ell+1)/2/np.pi
+            elif not prefactor and self.prefactor:
+                spec = spec*2*np.pi/ell/(ell+1)
+            ax.plot(ell, spec, fmt, **kwargs)
             ax.set_xlabel(r'$\ell$')
             ax.set_ylabel(spec_name)
+            if logx:
+                ax.set_xscale('log')
+            if logy:
+                ax.set_yscale('log')
             if legend and not legend_below:
                 ax.legend()
         plt.tight_layout()
@@ -205,16 +211,48 @@ class PS:
         for i,s in enumerate(target): new_ps.ps[s] = rdata[:,i]
         return new_ps
 
-    def covmat(self, noise, f_sky):
-        """get covariance matrix given a noise model"""
-        return covmat(self.values, noise.nlev, noise.fwhm, noise.lmin,
-                      noise.lmax, f_sky, prefactor=self.prefactor)
+    def covmat(self, noise, f_sky=1):
+        """get covariance matrix given a noise model
+        Args:
+            noise: noise model of PS class
+            f_sky: sky coverage fraction, 1 means full-sky coverage
+        Returns:
+            cov: a tensor of size [n_ell, n_ps, n_ps], for example with
+                 a lmax of 5000, the tensor size will be [5000, 4, 4]
+        """
+        # assuming the beam is a gaussian beam with an ell dependent
+        # beam size
+        # ps_w_noise = self + noise
+        ps = self.resample(noise.ell)
+        ell, ClTT, ClEE, ClBB, ClTE = [ps.ps[spec]
+                                       for spec in ['ell', 'TT','EE','BB','TE']]
+        new_noise = noise.resample(ell)
+        NlTT, NlEE, NlBB, NlTE = [new_noise.ps[spec] for spec in ['TT','EE','BB','TE']]
+        # initialize empty covariance tensor. Since the covariance matrix
+        # depends on ell, we will make a higher dimensional array [n_ell,
+        # n_ps, n_ps] where the first index represents different ells, the
+        # second and third parameters represents different power spectra
+        n_ells = len(ell)
+        cov = np.zeros([n_ells, 4, 4])
+        cov[:,0,0] = 2/(2*ell+1)*(ClTT+NlTT)**2
+        cov[:,1,1] = 2/(2*ell+1)*(ClEE+NlEE)**2
+        cov[:,2,2] = 2/(2*ell+1)*(ClBB+NlBB)**2
+        cov[:,3,3] = 1/(2*ell+1)*(ClTE**2+(ClTT+NlTT)*(ClEE+NlEE))
+        cov[:,0,1] = 2/(2*ell+1)*ClTE**2
+        cov[:,1,0] = 2/(2*ell+1)*ClTE**2
+        cov[:,0,3] = 2/(2*ell+1)*ClTE*(ClTT+NlTT)
+        cov[:,3,0] = 2/(2*ell+1)*ClTE*(ClTT+NlTT)
+        cov[:,1,3] = 2/(2*ell+1)*ClTE*(ClEE+NlEE)
+        cov[:,3,1] = 2/(2*ell+1)*ClTE*(ClEE+NlEE)
+        # now we include the effect of partial sky coverage
+        cov /= f_sky
+        return ell, cov
 
 
 class SimpleNoise(PS):
-    def __init__(self, nlev, fwhm, lmin, lmax, prefactor=True):
+    def __init__(self, nlev, fwhm, lmin, lmax):
         self.order = ('ell','TT','EE','BB','TE')
-        self.prefactor = prefactor
+        self.prefactor = False
         self.nlev = nlev
         self.fwhm = fwhm
         ell = np.arange(lmin, lmax+1)
@@ -379,7 +417,6 @@ def gen_ps_realization(ps, prefactor=True):
     # performance becomes an issue
     for i in range(len(ells)):
         l = int(ells[i])
-
         # generate gaussian random complex numbers with unit variance
         zeta1 = np.abs(np.random.randn(l+1))*np.exp(1j*np.random.rand(l+1)*2*np.pi)
         zeta2 = np.abs(np.random.randn(l+1))*np.exp(1j*np.random.rand(l+1)*2*np.pi)
