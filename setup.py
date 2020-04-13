@@ -4,9 +4,9 @@
 """The setup script."""
 
 from setuptools import setup, find_packages
-# from distutils.extension import Extension
-# from Cython.Build import cythonize
-# import numpy as np
+from distutils.extension import Extension
+from Cython.Build import cythonize
+import numpy as np
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()
@@ -43,14 +43,13 @@ setup(
     url='https://github.com/guanyilun/cosmoslib',
     version='0.1.0',
     zip_safe=False,
-    # not used build by default
-    # ext_modules=cythonize([
-    #     Extension(
-    #         name="cosmoslib.ps._ps",
-    #         sources=["cosmoslib/ps/ps.pyx"],
-    #         include_dirs=[np.get_include()],
-    #         extra_compile_args=['-fopenmp'],
-    #         extra_link_args=['-fopenmp'],
-    #     )
-    # ])
+    ext_modules=cythonize([
+        Extension(
+            name="cosmoslib.like._likelihood",
+            sources=["cosmoslib/like/_likelihood.pyx"],
+            include_dirs=[np.get_include()],
+            # extra_compile_args=['-fopenmp'],
+            # extra_link_args=['-fopenmp'],
+        )
+    ])
 )

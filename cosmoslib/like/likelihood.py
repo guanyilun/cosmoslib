@@ -1,6 +1,7 @@
 """various likelihood calculation"""
 import numpy as np
-from .ps import Dl2Cl, resample
+from cosmoslib.ps import Dl2Cl, resample
+from ._likelihood import exact_likelihood_fast
 
 
 class ExactLikelihood:
@@ -19,24 +20,12 @@ class ExactLikelihood:
     def __call__(self, ps_theory):
         """Assuming ps_theory is a power spectrum (PS) object"""
         ps_resample = ps_theory.resample(self.ps_data.ell)
-        ps_w_noise = ps_resample + noise
-        cl = ps_w_noise.ps
-        dl = self.ps_data.ps
-
-        chi2 = 0
-        for i, l in enumerate(psd.ell):
-            # T, E
-            det = cl['TT'][i]*cl['EE'][i]-cl['TE'][i]**2
-            dof = self.f_sky*(2*l+1)
-
-            chi2 += dof*(1./det*(dl['TT'][i]*cl['EE'][i]-2*dl['TE'][i]*cl['TE']['i'] + \
-                                 dl['EE'][i]*cl['TT'][i]) + \
-                         np.log(det/(dl['TT'][i]*dl['EE'][i]-dl['TE'][i]**2))-2)
-            # B
-            chi2 += dof*(1./cl['BB'][i]*dl['BB'][i]+np.log(cl['BB'][i]/dl['BB'][i])-1)
-
-        like = -0.5*chi2
-
+        ps_w_noise = (ps_theory + self.noise).resample(self.ps_data.ell)
+        ps_data = self.ps_data.resample(ps_w_noise.ell)
+        cl = ps_w_noise.remove_prefactor().ps
+        dl = ps_data.remove_prefactor().ps
+        return exact_likelihood_fast(cl['ell'],cl['TT'],cl['EE'],cl['BB'],cl['TE'],
+                                     dl['TT'],dl['EE'],dl['BB'],dl['TE'],self.f_sky)
 
 def exact_likelihood(ps_theory, ps_data, nl, f_sky=1., prefactor=True):
     """Calculate the exact likelihood based on the T, E, B, TE power

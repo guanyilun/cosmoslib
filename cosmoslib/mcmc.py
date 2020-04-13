@@ -6,7 +6,7 @@ import emcee
 import dill as pickle
 
 from cosmoslib.ps import Dl2Cl, resample
-from cosmoslib.likelihood import exact_likelihood
+from cosmoslib.like import exact_likelihood
 
 
 class MCMC(object):
