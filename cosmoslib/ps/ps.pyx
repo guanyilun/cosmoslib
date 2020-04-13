@@ -1,3 +1,5 @@
+"""A faster version of covmat, no longer used, kept for reference only"""
+
 import numpy as np
 from .ps import Dl2Cl, Cl2Dl
 from cython.parallel import prange
