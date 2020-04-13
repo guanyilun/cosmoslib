@@ -11,7 +11,7 @@ import healpy as hp
 
 class PS:
     """A container for CMB power spectrum."""
-    def __init__(self, arg=None, order=('ell','TT','EE','BB','TE'), prefactor=False):
+    def __init__(self, arg=None, order=('ell','TT','EE','BB','TE'), prefactor=False, verbose=False):
         """Simple power spectrum data wrapper
 
         Args:
@@ -25,6 +25,7 @@ class PS:
         self.ps = {}
         self.order=order
         self.prefactor=prefactor
+        self.verbose=False
         # populate ps depending on the inputs
         if type(arg) == str:
             self.load_file(arg, order, prefactor)
@@ -60,7 +61,8 @@ class PS:
             raise NotImplementedError("Currently only support PS type ops!")
         # check for ell mismatch
         if np.any(self.ell != other.ell):
-            print("Warning: ells mismatch, interpolating...")
+            if self.verbose:
+                print("Warning: ells mismatch, interpolating...")
             return self.resample(other.ell) + other.resample(self.ell)
         # find common specs
         new_order = ['ell'] + [s for s in self.specs if s in other.specs]
@@ -81,7 +83,8 @@ class PS:
             raise NotImplementedError("Currently only support PS type ops!")
         # check for ell mismatch
         if np.any(self.ell != other.ell):
-            print("Warning: ells mismatch, interpolating...")
+            if self.verbose:
+                print("Warning: ells mismatch, interpolating...")
             return self.resample(other.ell) - other.resample(self.ell)
         # find common specs
         new_order = ['ell'] + [s for s in self.specs if s in other.specs]
@@ -447,10 +450,10 @@ def gen_ps_realization(ps, prefactor=True):
         aElm = zeta1 * ClTE[i] / (ClTT[i])**0.5 + zeta2*(ClEE[i] - ClTE[i]**2/ClTT[i])**0.5
         aBlm = zeta3 * ClBB[i]**0.5
 
-        i_ClTT = (aTlm[0]**2 + 2*(np.sum(np.abs(aTlm[1:])**2)))/(2*l+1)
-        i_ClEE = (aElm[0]**2 + 2*(np.sum(np.abs(aElm[1:])**2)))/(2*l+1)
-        i_ClBB = (aBlm[0]**2 + 2*(np.sum(np.abs(aBlm[1:])**2)))/(2*l+1)
-        i_ClTE = (aTlm[0]*aElm[0] + 2*(np.sum(np.conj(aTlm[1:])*aElm[1:])))/(2*l+1)
+        i_ClTT = np.real((aTlm[0]**2 + 2*(np.sum(np.abs(aTlm[1:])**2)))/(2*l+1))
+        i_ClEE = np.real((aElm[0]**2 + 2*(np.sum(np.abs(aElm[1:])**2)))/(2*l+1))
+        i_ClBB = np.real((aBlm[0]**2 + 2*(np.sum(np.abs(aBlm[1:])**2)))/(2*l+1))
+        i_ClTE = np.real((aTlm[0]*aElm[0] + 2*(np.sum(np.conj(aTlm[1:])*aElm[1:])))/(2*l+1))
 
         # assign the new values to the new array
         m_ps[i,1] = i_ClTT
