@@ -418,9 +418,9 @@ def gen_ps_realization(ps, prefactor=True):
     for i in range(len(ells)):
         l = int(ells[i])
         # generate gaussian random complex numbers with unit variance
-        zeta1 = np.abs(np.random.randn(l+1))*np.exp(1j*np.random.rand(l+1)*2*np.pi)
-        zeta2 = np.abs(np.random.randn(l+1))*np.exp(1j*np.random.rand(l+1)*2*np.pi)
-        zeta3 = np.abs(np.random.randn(l+1))*np.exp(1j*np.random.rand(l+1)*2*np.pi)
+        zeta1 = (np.random.randn(l+1)+1j*np.random.randn(l+1))/np.sqrt(2)
+        zeta2 = (np.random.randn(l+1)+1j*np.random.randn(l+1))/np.sqrt(2)
+        zeta3 = (np.random.randn(l+1)+1j*np.random.randn(l+1))/np.sqrt(2)
 
         # for m=0, zeta has to be real
         zeta1[0] = np.abs(zeta1[0])
