@@ -6,6 +6,7 @@ with camb, power spectrum and covariance matrix
 
 import numpy as np
 from scipy import interpolate
+import healpy as hp
 
 
 class PS:
@@ -198,8 +199,8 @@ class PS:
             plt.savefig(filename, bbox_inches='tight')
         return axes
 
-    def gen_realization(self):
-        """Generate a realization of the power spectra"""
+    def gen_sim(self):
+        """Generate a sim realization of the power spectra, use internal version"""
         # make sure we have everything we want
         target = ['ell','TT','EE','BB','TE']
         ok = [s for s in target if s in self.order] == target
@@ -210,6 +211,27 @@ class PS:
         new_ps = PS(order=target, prefactor=self.prefactor)
         for i,s in enumerate(target): new_ps.ps[s] = rdata[:,i]
         return new_ps
+
+    def gen_sim_hp(self):
+        """Generate a sim realization of the power spectra, wrapped around healpy,
+        this is often 30% faster"""
+        alm = self.gen_alm()
+        cl = hp.sphtfunc.alm2cl(alm)
+        ell = np.arange(cl.shape[1])
+        ps = PS(cl.T, order=('TT', 'EE', 'BB', 'TE', 'EB', 'TB'), prefactor=False)
+        ps.ps['ell'] = ell
+        ps.order += ('ell',)
+        return ps
+
+    def gen_alm(self):
+        if self.prefactor:
+            self.remove_prefactor()
+        # healpy requires array starts from zero, fill will 0
+        ps = np.zeros((4,self.lmax+1))
+        ps[:,self.lmin:] = self.values[:,1:].T
+        alm = hp.synalm((ps[0],ps[1],ps[2],ps[3],np.zeros_like(ps[0]),np.zeros_like(ps[0])),
+                        lmax=self.lmax, verbose=False, new=True)
+        return alm
 
     def covmat(self, noise, f_sky=1):
         """get covariance matrix given a noise model
