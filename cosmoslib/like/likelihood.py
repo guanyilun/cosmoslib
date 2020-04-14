@@ -1,7 +1,7 @@
 """various likelihood calculation"""
 import numpy as np
 from cosmoslib.ps import Dl2Cl, resample
-from ._likelihood import exact_likelihood_fast
+from . import _likelihood as cython
 
 
 class ExactLikelihood:
@@ -24,9 +24,37 @@ class ExactLikelihood:
         ps_data = self.ps_data.resample(ps_w_noise.ell)
         cl = ps_w_noise.remove_prefactor().ps
         dl = ps_data.remove_prefactor().ps
-        return exact_likelihood_fast(cl['ell'],cl['TT'],cl['EE'],cl['BB'],cl['TE'],
-                                     dl['TT'],dl['EE'],dl['BB'],dl['TE'],self.f_sky)
+        return cython.exact_like(cl['ell'],cl['TT'],cl['EE'],cl['BB'],cl['TE'],
+                                 dl['TT'],dl['EE'],dl['BB'],dl['TE'],self.f_sky)
 
+class GaussianLikelihood:
+    def __init__(self, ps_data, noise, f_sky=1.):
+        """Calculate Exact likelihood (wishart likelihood).
+
+        Args:
+            ps_data (PS): power spectrum object from data
+            noise (Noise): noise object
+            f_sky: sky coverage
+        """
+        self.ps_data = ps_data
+        self.noise = noise
+        self.f_sky = f_sky
+
+    def __call__(self, ps_theory):
+        ell, cov = ps_theory.covmat(self.noise, self.f_sky)
+        ps_w_noise = (ps_theory+self.noise).resample(ell)
+        ps_data = self.ps_data.resample(ell)
+        cl = ps_w_noise.remove_prefactor().values
+        dl = ps_data.remove_prefactor().values
+        chi2 = 0
+        for i in range(len(ell)):
+            err = np.abs(cl[i,1:] - dl[i,1:])
+            icov = np.linalg.inv(cov[i,:,:])
+            chi2 += np.einsum("ij,i,j", icov, err, err)
+        like = -0.5*chi2
+        return like
+
+# legacy function: leave it here for backwards compatibility
 def exact_likelihood(ps_theory, ps_data, nl, f_sky=1., prefactor=True):
     """Calculate the exact likelihood based on the T, E, B, TE power
     spectra.
