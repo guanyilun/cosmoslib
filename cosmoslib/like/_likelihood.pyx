@@ -4,9 +4,9 @@ cimport cython
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
-cpdef double exact_likelihood_fast(double[:] ells, double[:] ClTT, double[:] ClEE, double[:] ClBB,
-                                   double[:] ClTE, double[:] DlTT, double[:] DlEE, double[:] DlBB,
-                                   double[:] DlTE, float f_sky):
+cpdef double exact_like(double[:] ells, double[:] ClTT, double[:] ClEE, double[:] ClBB,
+                        double[:] ClTE, double[:] DlTT, double[:] DlEE, double[:] DlBB,
+                        double[:] DlTE, double f_sky):
     """internal function to calculate exact-likelihood
     Args:
         ells, Cl{TT,EE,BB,TE}: theory c_\ell
