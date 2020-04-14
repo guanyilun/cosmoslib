@@ -295,13 +295,14 @@ class SimpleNoise(PS):
 
 
 class Covmat:
+    """Simple block diagonal covariance matrix"""
     def __init__(self, ell, cov, order=('TT','EE','BB','TE')):
         self.order = order
         self.cov = cov
         self.ell = ell
     def inv(self):
         icov = np.zeros_like(self.cov)
-        for i in range(self.ell):
+        for i in range(len(self.ell)):
             icov[i,:,:] = np.linalg.inv(self.cov[i,:,:])
         return Covmat(self.ell, icov)
     def save(self, filename):
