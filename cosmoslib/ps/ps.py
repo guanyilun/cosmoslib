@@ -7,6 +7,7 @@ with camb, power spectrum and covariance matrix
 import numpy as np
 from scipy import interpolate
 import healpy as hp
+import pickle
 
 
 class PS:
@@ -280,17 +281,22 @@ class PS:
     def save(self, filename):
         np.savetxt(filename, self.values, comments=",".join(self.order))
 
-
-class SimpleNoise(PS):
-    def __init__(self, nlev, fwhm, lmin, lmax):
+class Noise(PS):
+    def __init__(self, lmin, lmax):
         self.order = ('ell','TT','EE','BB','TE')
         self.prefactor = False
+        ell = np.arange(lmin, lmax+1)
+        self.ps = {'ell': ell}
+
+class SimpleNoise(Noise):
+    def __init__(self, nlev, fwhm, lmin, lmax):
+        super().__init__(self, lmin, lmax)
         self.nlev = nlev
         self.fwhm = fwhm
-        ell = np.arange(lmin, lmax+1)
+        ell = self.ps['ell']
         NlTT = nlev**2*np.exp(ell*(ell+1)*fwhm**2/(8.*np.log(2)))
         NlPP = 2*NlTT
-        self.ps = {'ell': ell, 'TT': NlTT, 'EE': NlPP,
+        self.ps = {'TT': NlTT, 'EE': NlPP,
                    'BB': NlPP, 'TE': np.zeros_like(ell)}
 
 
@@ -306,7 +312,7 @@ class Covmat:
             icov[i,:,:] = np.linalg.inv(self.cov[i,:,:])
         return Covmat(self.ell, icov)
     def save(self, filename):
-        with open(filename, 'w') as f:
+        with open(filename, 'wb') as f:
             pickle.dump(self, f)
     def __getitem__(self, field):
         """field can be of form TTTT,TTEE, etc"""
@@ -374,6 +380,32 @@ def resample(ps, ell):
 
     return cl_predicted
 
+
+def join_noise_models(noise_models, method='min'):
+    """join multiple noise models by a given method. Currently
+    only method that works is the min, which means choose the
+    noise_models with minimum noise in each ell.
+
+    Args:
+        noise_models: list of noise models
+        method: method used to combine
+    Returns:
+        A new noise model with the noise models combined
+    """
+    # find lmin
+    lmin = min(nm.lmin for nm in noise_models)
+    lmax = max(nm.lmax for nm in noise_models)
+    ell = np.arange(0, lmax+1)
+    noise = Noise(lmin, lmax)
+    for spec in ['TT','EE','BB','TE']:
+        cl = np.zeros_like(ell)
+        for nm in noise_models:
+            mask = np.logical_or(nm[spec]<cl[nm.ell], cl[nm.ell]==0)
+            bigmask = np.zeros_like(ell)
+            bigmask[nm.ell] = mask
+            cl[bigmask] = nm[spec]
+        noise.ps[spec] = cl[noise.ell]
+    return noise
 
 def N_l(ells, power_noise, beam_size, prefactor=True):
     """Calculate the noise spectra for a given noise-level and beam size.
