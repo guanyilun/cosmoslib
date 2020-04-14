@@ -4,6 +4,7 @@ very useful and import it into this lib."""
 import time, sys, os, glob
 import subprocess as sp
 import numpy as np
+from cosmoslib.utils import rand_chars
 
 DEFAULTS = {
     'local_temp_dir': '.cambex',
@@ -120,7 +121,7 @@ class CambSession:
         if rank is None:
             lead = 'X'
         else:
-            lead = str(rank)
+            lead = '%s_%s' % (rank, rand_chars(5))
         if output_dir is None:
             output_dir = DEFAULTS['local_temp_dir']
         self.output_dir = output_dir

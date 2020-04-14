@@ -1,4 +1,5 @@
 """utility libraries"""
+import random, string
 from cytoolz.functoolz import memoize
 
 
@@ -30,6 +31,11 @@ def load_context(path=None):
         else:
             return None
     # if we are here we will have found one context
-    print(f"Loading context: {config_path}")
-    context = ConfigParser(config_path, interpolation=EI())
+    context = ConfigParser(os.environ, interpolation=EI())
+    context.read(config_path)
     return context
+
+
+def rand_chars(n):
+    """Generate n random characters"""
+    return ''.join(random.choice(string.ascii_letters) for x in range(n))
