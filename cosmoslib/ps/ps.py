@@ -124,6 +124,10 @@ class PS:
         # made sure ell starts from index 0
         return np.vstack([self.ps[s] for s in self.order]).T
 
+    @property
+    def shape(self):
+        return self.values.shape
+
     def add_prefactor(self, inplace=True):
         if self.prefactor: return self
         if inplace:
@@ -266,6 +270,8 @@ class PS:
         cov /= f_sky
         return ell, cov
 
+    def save(self, filename):
+        np.savetxt(filename, self.values, comments=",".join(self.order))
 
 class SimpleNoise(PS):
     def __init__(self, nlev, fwhm, lmin, lmax):
