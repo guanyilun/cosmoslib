@@ -18,8 +18,8 @@ def plot_ps(total_ps, fmt="-", axes=None, **kwargs):
 
     for i, label in enumerate(['TT','EE','BB','TE']):
         ax = axes[i//2,i%2]
-        ax.set_xlabel('$\ell$')
-        ax.set_ylabel('$\ell(\ell+1)C_l^{%s}/2\pi$' % label)
+        ax.set_xlabel(r'$\ell$')
+        ax.set_ylabel(r'$\ell(\ell+1)C_\ell^{\rm %s}/2\pi$' % label)
         ax.legend()
 
     return axes

@@ -1,4 +1,4 @@
-"""This script contains some useful class and functions for 
+"""This script contains some useful class and functions for
 fisher matrix manipulation.
 
 Most codes are taken from:
@@ -180,7 +180,7 @@ class Fisher(object):
         list of parameters provided
         """
         fac = len(params)-1
-        
+
         f, allaxes = plt.subplots(fac, fac, figsize=(fac*fsize, fac*fsize),
                                   sharex="col", sharey="row")
 
@@ -212,12 +212,11 @@ class Fisher(object):
                         if (jp==0):
                             axis.set_ylabel(self.param_names[j], fontsize=14)
                         #allaxes[jp][ip].set_title(str(jp)+","+str(ip))
-                
+
 
         for i in range(fac):
             for j in range(fac):
                 if (j>i):
                     allaxes[i][j].axis('off')
-
         plt.ticklabel_format(style='sci', axis='both', scilimits=(-3,3))
         plt.tight_layout()
