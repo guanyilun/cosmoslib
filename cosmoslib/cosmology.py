@@ -6,13 +6,22 @@ estimation, etc.
 from .cambex import CambSession
 from scipy.interpolate import interp1d
 import numpy as np
+from .utils import get_context
 
 
 class Cosmology(object):
 
     def __init__(self, camb_bin=None, base_params=None,
                  model_params={}, rank=None, legacy=False, output_dir=None):
-        self.camb = CambSession(camb_bin=camb_bin, rank=rank, 
+        # attempt to load supplied parameters from context
+        context = get_context()
+        if context:
+            if not camb_bin:
+                camb_bin = context['camb']['camb_bin']
+                legacy = context['camb'].getboolean('camb_legacy', True)
+            if not output_dir:
+                output_dir = context['camb']['output_dir']
+        self.camb = CambSession(camb_bin=camb_bin, rank=rank,
                                 output_dir=output_dir)
         self.base_params = base_params
         self.model_params = model_params
@@ -41,7 +50,6 @@ class Cosmology(object):
             # have an option to skip certain keys
             if k in exclude_list:
                 continue
-
             # define look up rules here
             if k == 'r_t':
                 if self.legacy:
