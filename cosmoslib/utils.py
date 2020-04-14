@@ -18,7 +18,9 @@ def load_context(path=None):
     if path:
         config_path = path
     else:
-        # search for the context.ini files in os
+        # search for the context.ini file, if not in the cwd or the
+        # parent directory try to find ~/.cosmosrc file, if nothing
+        # is found, return None
         if op.exists(op.join(os.getcwd(),'context.ini')):
             config_path = op.join(os.getcwd(),'context.ini')
         elif op.exists(op.join(os.getcwd(),'..','context.ini')):
@@ -29,5 +31,5 @@ def load_context(path=None):
             return None
     # if we are here we will have found one context
     print(f"Loading context: {config_path}")
-    context = ConfigParser(config_path, EI)
+    context = ConfigParser(config_path, interpolation=EI())
     return context
