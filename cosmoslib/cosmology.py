@@ -6,15 +6,16 @@ estimation, etc.
 from .cambex import CambSession
 from scipy.interpolate import interp1d
 import numpy as np
-from .utils import get_context
+from .utils import load_context
+from .ps import PS
 
 
 class Cosmology(object):
-
+    """Basic cosmology class based on camb"""
     def __init__(self, camb_bin=None, base_params=None,
                  model_params={}, rank=None, legacy=False, output_dir=None):
         # attempt to load supplied parameters from context
-        context = get_context()
+        context = load_context()
         if context:
             if not camb_bin:
                 camb_bin = context['camb']['camb_bin']
@@ -125,7 +126,9 @@ class Cosmology(object):
         self.camb.cleanup()
 
         # return a user defined target spectrum
-        return self.target_spectrum(self)
+        target_spec = self.target_spectrum(self)
+        # wrap as a PS object
+        return PS(target_spec, prefactor=True)
 
     def full_run(self):
         """This will be the method called by MCMC sampler. It can be the same
