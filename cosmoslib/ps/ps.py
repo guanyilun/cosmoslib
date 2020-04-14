@@ -99,6 +99,11 @@ class PS:
             new_ps.ps[s] = self.ps[s] - other.ps[s]
         return new_ps
 
+    def __getitem__(self, field):
+        if field not in self.order:
+            raise ValueError(f"{field} not found!")
+        return self.ps[field]
+
     @classmethod
     def from_arr(cls, arr, order=('ell','TT','EE','BB','TE'), prefactor=True):
         return cls(arr, order, prefactor)
@@ -268,10 +273,13 @@ class PS:
         cov[:,3,1] = 2/(2*ell+1)*ClTE*(ClEE+NlEE)
         # now we include the effect of partial sky coverage
         cov /= f_sky
-        return ell, cov
+        covmat = Covmat(ell, cov)
+
+        return covmat
 
     def save(self, filename):
         np.savetxt(filename, self.values, comments=",".join(self.order))
+
 
 class SimpleNoise(PS):
     def __init__(self, nlev, fwhm, lmin, lmax):
@@ -284,6 +292,37 @@ class SimpleNoise(PS):
         NlPP = 2*NlTT
         self.ps = {'ell': ell, 'TT': NlTT, 'EE': NlPP,
                    'BB': NlPP, 'TE': np.zeros_like(ell)}
+
+
+class Covmat:
+    def __init__(self, ell, cov, order=('TT','EE','BB','TE')):
+        self.order = order
+        self.cov = cov
+        self.ell = ell
+    def inv(self):
+        icov = np.zeros_like(self.cov)
+        for i in range(self.ell):
+            icov[i,:,:] = np.linalg.inv(self.cov[i,:,:])
+        return Covmat(self.ell, icov)
+    def save(self, filename):
+        with open(filename, 'w') as f:
+            pickle.dump(self, f)
+    def __getitem__(self, field):
+        """field can be of form TTTT,TTEE, etc"""
+        if len(field) !=4:
+            raise ValueError("Field has to be of form TTEE, TTBB, etc!")
+        spec1 = field[:2]
+        spec2 = field[2:]
+        if (spec1 not in self.order) or (spec2 not in self.order):
+            raise ValueError(f"{field} not found")
+        idx1 = self.order.index(spec1)
+        idx2 = self.order.index(spec2)
+        return self.cov[:,idx1,idx2]
+    @classmethod
+    def from_file(cls, filename):
+        with open(filename, "r") as f:
+            return pickle.load(f)
+
 
 def _check_ps(ps):
     """Check the type of power spectra"""
