@@ -11,11 +11,7 @@ from cosmoslib.like import exact_likelihood
 
 class MCMC(object):
     """Class for running MCMC"""
-    def __init__(self, ps_data=None, N_l=None, n_walkers=2, f_sky=1.,
-                 initial_delta=0.01, backend_file=None, version='v1'):
-        self.f_sky = f_sky
-        self.ps_data = ps_data
-        self.N_l = N_l
+    def __init__(self, n_walkers=2, initial_delta=0.01, backend_file=None):
         self.n_walkers = n_walkers
         self.initial_delta = initial_delta
         self.sampler = None
@@ -25,7 +21,6 @@ class MCMC(object):
         self.fit_keys = []
         self.backend_file = backend_file
         self.likelihoods = []
-        self.version = version
 
     def set_params(self, params):
         """This method assigns parameters to the MCMC algorithm"""
@@ -103,16 +98,6 @@ class MCMC(object):
             return prior + like
         else:
             return -np.inf
-
-    def set_f_sky(self, f_sky):
-        """Set the effective f_sky. It will be used as
-        an effective reduction in the number of degrees of
-        freedom"""
-        self.f_sky = f_sky
-
-    def set_ps_data(self, ps_data):
-        """Set the data power spectra"""
-        self.ps_data = ps_data
 
     def run(self, N, pos0=None, resume=False, **kwargs):
         """Run the mcmc sampler with an ensemble sampler from emcee
