@@ -281,6 +281,7 @@ class PS:
     def save(self, filename):
         np.savetxt(filename, self.values, comments=",".join(self.order))
 
+
 class Noise(PS):
     def __init__(self, lmin, lmax):
         self.order = ('ell','TT','EE','BB','TE')
@@ -288,16 +289,17 @@ class Noise(PS):
         ell = np.arange(lmin, lmax+1)
         self.ps = {'ell': ell}
 
+
 class SimpleNoise(Noise):
     def __init__(self, nlev, fwhm, lmin, lmax):
-        super().__init__(self, lmin, lmax)
+        super().__init__(lmin, lmax)
         self.nlev = nlev
         self.fwhm = fwhm
         ell = self.ps['ell']
         NlTT = nlev**2*np.exp(ell*(ell+1)*fwhm**2/(8.*np.log(2)))
         NlPP = 2*NlTT
-        self.ps = {'TT': NlTT, 'EE': NlPP,
-                   'BB': NlPP, 'TE': np.zeros_like(ell)}
+        self.ps.update({'TT': NlTT, 'EE': NlPP,
+                        'BB': NlPP, 'TE': np.zeros_like(ell)})
 
 
 class Covmat:
@@ -392,18 +394,22 @@ def join_noise_models(noise_models, method='min'):
     Returns:
         A new noise model with the noise models combined
     """
-    # find lmin
+    # find lmin, lmax
     lmin = min(nm.lmin for nm in noise_models)
     lmax = max(nm.lmax for nm in noise_models)
+    # placeholder to find corresponding ells
     ell = np.arange(0, lmax+1)
     noise = Noise(lmin, lmax)
     for spec in ['TT','EE','BB','TE']:
-        cl = np.zeros_like(ell)
+        # place holder to find min noise
+        cl = np.zeros_like(ell).astype('float64')
         for nm in noise_models:
-            mask = np.logical_or(nm[spec]<cl[nm.ell], cl[nm.ell]==0)
-            bigmask = np.zeros_like(ell)
-            bigmask[nm.ell] = mask
-            cl[bigmask] = nm[spec]
+            nm_ell = nm.ell.astype(int)
+            mask = np.logical_or(nm[spec]<cl[nm_ell], cl[nm_ell]==0)
+            orig_mask = np.zeros_like(ell).astype(bool)
+            orig_mask[nm_ell] = mask
+            idx = np.where(orig_mask)[0]
+            cl[idx] = nm[spec][mask]
         noise.ps[spec] = cl[noise.ell]
     return noise
 
