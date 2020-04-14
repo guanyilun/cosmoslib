@@ -97,12 +97,8 @@ class MCMC(object):
         # now i trust that there is no error
         prior = self.lnprior(theta)
         if np.isfinite(prior):
-            if self.version == 'v1'
-                like = exact_likelihood(ps_theory, self.ps_data,
-                                        self.N_l, self.f_sky)
-            elif self.version == 'v2':
-                for like_func in self.likelihoods:
-                    like += like_func(ps_theory)
+            for like_func in self.likelihoods:
+                like += like_func(ps_theory)
             print("Parameter: %s\t loglike: %.2f" % (theta, like))
             return prior + like
         else:
