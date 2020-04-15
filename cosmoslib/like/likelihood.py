@@ -5,7 +5,7 @@ from . import _likelihood as cython
 
 
 class ExactLikelihood:
-    def __init__(self, ps_data, noise, f_sky=1.):
+    def __init__(self, ps_data, noise, f_sky=1., lmin=None, lmax=None):
         """Calculate Exact likelihood (wishart likelihood).
 
         Args:
@@ -16,43 +16,66 @@ class ExactLikelihood:
         self.ps_data = ps_data
         self.noise = noise
         self.f_sky = f_sky
+        self.lmin = lmin
+        self.lmax = lmax
 
     def __call__(self, ps_theory):
         """Assuming ps_theory is a power spectrum (PS) object"""
         ps_resample = ps_theory.resample(self.ps_data.ell)
         ps_w_noise = (ps_theory + self.noise).resample(self.ps_data.ell)
         ps_data = self.ps_data.resample(ps_w_noise.ell)
-        cl = ps_w_noise.remove_prefactor().ps
-        dl = ps_data.remove_prefactor().ps
+        cl = ps_w_noise.remove_prefactor()
+        dl = ps_data.remove_prefactor()
+        lmin = self.lmin if self.lmin else ps_data.lmin
+        lmax = self.lmax if self.lmax else ps_data.lmax
         return cython.exact_like(cl['ell'],cl['TT'],cl['EE'],cl['BB'],cl['TE'],
-                                 dl['TT'],dl['EE'],dl['BB'],dl['TE'],self.f_sky)
+                                 dl['TT'],dl['EE'],dl['BB'],dl['TE'],lmin,
+                                 lmax,self.f_sky)
+
 
 class GaussianLikelihood:
-    def __init__(self, ps_data, noise, f_sky=1.):
-        """Calculate Exact likelihood (wishart likelihood).
+    def __init__(self, ps_data, noise, cov, f_sky=1., lmin=None, lmax=None):
+        """Calculate Gaussian likelihood with fixed covariance
 
         Args:
             ps_data (PS): power spectrum object from data
             noise (Noise): noise object
             f_sky: sky coverage
+            cov: inverse covmat of Covmat class
         """
         self.ps_data = ps_data
         self.noise = noise
+        self.cov = cov
         self.f_sky = f_sky
+        self.icov = cov.inv()
+        self.lmin = lmin
+        self.lmax = lmax
 
     def __call__(self, ps_theory):
-        ell, cov = ps_theory.covmat(self.noise, self.f_sky)
+        # for varied covariance matrix
+        # ell, cov = ps_theory.covmat(self.noise, self.f_sky)
+        ell, icov = self.icov.ell, self.icov.cov
         ps_w_noise = (ps_theory+self.noise).resample(ell)
         ps_data = self.ps_data.resample(ell)
         cl = ps_w_noise.remove_prefactor().values
         dl = ps_data.remove_prefactor().values
         chi2 = 0
         for i in range(len(ell)):
-            err = np.abs(cl[i,1:] - dl[i,1:])
-            icov = np.linalg.inv(cov[i,:,:])
-            chi2 += np.einsum("ij,i,j", icov, err, err)
+            l = ell[i]
+            # respect the boundary if that's set
+            if self.lmin:
+                if l < self.lmin: continue
+            if self.lmax:
+                if l > self.lmax: continue
+            # note that there shouldn't not be an absolute value here
+            err = cl[i,1:]-dl[i,1:]
+            # using a constant cov, so log_det is not needed
+            # log_det = -np.log(np.linalg.det(icov[i,:,:]))
+            chi2 += np.einsum("ij,i,j", icov[i,:,:], err, err)*self.f_sky # + log_det
         like = -0.5*chi2
         return like
+
+
 
 # legacy function: leave it here for backwards compatibility
 def exact_likelihood(ps_theory, ps_data, nl, f_sky=1., prefactor=True):

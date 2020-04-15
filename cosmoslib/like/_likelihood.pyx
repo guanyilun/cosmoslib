@@ -6,11 +6,12 @@ cimport cython
 @cython.cdivision(True)
 cpdef double exact_like(double[:] ells, double[:] ClTT, double[:] ClEE, double[:] ClBB,
                         double[:] ClTE, double[:] DlTT, double[:] DlEE, double[:] DlBB,
-                        double[:] DlTE, double f_sky):
+                        double[:] DlTE, double lmin, double lmax, double f_sky):
     """internal function to calculate exact-likelihood
     Args:
         ells, Cl{TT,EE,BB,TE}: theory c_\ell
         Dl{TT,EE,BB,TE}: data c_\ell
+        l{min,max}: range of ell to consider
         f_sky: sky coverage
     Returns:
         log-likelihood
@@ -21,6 +22,8 @@ cpdef double exact_like(double[:] ells, double[:] ClTT, double[:] ClEE, double[:
     chi2 = 0
     for i in range(len(ells)):
         l = ells[i]
+        if l < lmin: continue
+        if l > lmax: continue
         # T, E
         det = ClTT[i]*ClEE[i]-ClTE[i]**2
         dof = f_sky*(2*l+1)
