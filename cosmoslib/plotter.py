@@ -45,6 +45,19 @@ def set_plotstyle(options={}, style='default'):
         default['legend.fontsize'] = 18
         default['lines.linewidth'] = 2
         default['axes.prop_cycle'] = "cycler(color=['#2424f0','#df6f0e','#3cc03c','#d62728','#b467bd','#ac866b','#e397d9','#9f9f9f','#ecdd72','#77becf'])"
+    elif skyle == 's1':
+        "style stolen from astropaint"
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+
+        plt.style.use("seaborn-poster")
+        default["figure.figsize"] = (6, 4)
+        default["text.usetex"] = True
+        default["font.size"] = 16
+        default["font.family"] = "serif"
+        default['font.serif'] = 'Ubuntu'
+        default["figure.dpi"]= 100
+
     for key in default:
         plt.rcParams[key] = default[key]
     # overwrite if necessary
