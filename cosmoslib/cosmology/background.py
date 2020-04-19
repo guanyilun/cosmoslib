@@ -1,3 +1,11 @@
+"""Basic background cosmology calculation
+
+Lots of codes adapted from
+https://github.com/marius311/Cosmology.jl/blob/master/src/PhysicalConstants.jl
+which is written in julia
+
+"""
+
 import numpy as np
 from scipy import integrate as scipy_integrate
 import sympy
@@ -239,13 +247,13 @@ class Cosmology:
         return self.theta_s_at_z(self.zstar_HS())
 
     # TODO: add reionization related stuff
-    # utility methods: no more physics
 
+    # utility methods: no more physics
     def _sub_all(self, var, expr):
         """Symbolic substitution in all fields"""
         for k, v in self.__dict__.items():
             if isinstance(v, sympy.Expr):
-                self.__dict__[k] = v.subs(field, expr)
+                self.__dict__[k] = v.subs(var, expr)
 
 
 def integrate(fun, lo, hi):
