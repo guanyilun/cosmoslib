@@ -33,6 +33,11 @@ class PS:
         elif type(arg) == np.ndarray:
             self.load_arr(arg, order, prefactor)
 
+    def __getattr__(self, key):
+        if key in self.ps:
+            return self.ps[key]
+        return self.__dict__[key]
+
     def load_arr(self, arr, order=('ell','TT','EE','BB','TE'), prefactor=True):
         """Load data from a given array"""
         if arr.shape[-1] != len(order):
