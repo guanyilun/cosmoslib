@@ -1,13 +1,16 @@
 """This script contains wrapper class that interacts with all
 components of the library to perform analysis such as fisher matrix
-estimation, etc.
+estimation, etc. It makes use of cambex: which is a good wrapper for
+run camb the old fashioned way when there is no good way to interact
+with python otherwise, such as for legecy codes that modify camb.
+
 """
 
 from .cambex import CambSession
 from scipy.interpolate import interp1d
 import numpy as np
-from .utils import load_context
-from .ps import PS
+from cosmoslib.utils import load_context
+from cosmoslib.ps import PS
 
 
 class Cosmology(object):

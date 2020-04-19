@@ -143,14 +143,16 @@ class Plotter(object):
         self.do_legend = False
         handles, labels = self._ax.get_legend_handles_labels()
         legend = self._ax.legend(handles, labels,loc=loc,prop={'size':labsize},numpoints=numpoints,frameon = 1,**kwargs)
-        return legend
+        # return legend
+        return self
 
     def add(self,x,y,label=None,lw=2,linewidth=None,addx=0,**kwargs):
         if linewidth is not(None): lw = linewidth
         if label is not None: self.do_legend = True
         scaler = self.scalefn(x)
         yc = y*scaler
-        return self._ax.plot(x+addx,yc,label=label,linewidth=lw,**kwargs)
+        self._ax.plot(x+addx,yc,label=label,linewidth=lw,**kwargs)
+        return self
 
     def hist(self,data,**kwargs):
         return self._ax.hist(data,**kwargs)
@@ -165,6 +167,7 @@ class Plotter(object):
         else:
             self._ax.errorbar(x*mulx+addx,yc,yerr=yerrc,ls=ls,marker=marker,elinewidth=elinewidth,markersize=markersize,label=label,alpha=alpha,**kwargs)
         if label is not None: self.do_legend = True
+        return self
 
     def plot2d(self,data,lim=None,levels=None,clip=0,clbar=True,cm=None,label=None,labsize=14,extent=None,ticksize=12,**kwargs):
         '''
@@ -195,9 +198,11 @@ class Plotter(object):
                 cbar.set_label(label,size=labsize)#,rotation=0)
     def hline(self,y=0.,ls="--",alpha=0.5,color="k",**kwargs):
         self._ax.axhline(y=y,ls=ls,alpha=alpha,color=color,**kwargs)
+        return self
 
     def vline(self,x=0.,ls="--",alpha=0.5,color="k",**kwargs):
         self._ax.axvline(x=x,ls=ls,alpha=alpha,color=color,**kwargs)
+        return self
 
     def done(self,filename=None,verbose=True,**kwargs):
         if self.do_legend: self.legend()

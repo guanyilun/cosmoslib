@@ -1,0 +1,6 @@
+* Cambex
+
+Borrowed from Matthew Hasselfield. Interact with camb in the old fashioned
+way. This is useful for legacy codes without good python interfaces. 
+The =cosmology= is a wrapper class for interacting with cambex and calculate
+various stuff with CMB power spectrum results. 

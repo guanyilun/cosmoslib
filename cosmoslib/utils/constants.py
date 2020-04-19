@@ -21,3 +21,18 @@ h = 6.62607004e-34 #m^2kg/s
 
 # boltzman constant
 kB = 1.38064852e-23 #m^2kg/s^2/K
+
+
+# Below are in planck units
+# taken from https://github.com/marius311/Cosmology.jl/blob/master/src/PhysicalConstants.jl
+# Thomson scattering cross section
+sigmaT = 2.546617863799246e41
+
+# Mass of the Hydrogen atom
+mH = 7.690195407123562e-20
+
+# Mass of the Helium atom
+mHe = 3.0538317277758185e-19
+
+# Mass of the proton
+mp = 7.685126339343148e-20
