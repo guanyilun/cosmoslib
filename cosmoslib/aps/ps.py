@@ -174,7 +174,8 @@ class PS:
 
     def plot(self, fmt="-", name='C_\ell', axes=None, ncol=2,
              legend=True, legend_below=True, filename=None,
-             prefactor=True, logx=True, logy=True, **kwargs):
+             prefactor=True, logx=True, logy=True, show_cov=False,
+             cov=None, xlim=[], ylim=[], **kwargs):
         """Plot the power spectra"""
         import matplotlib.pyplot as plt
         ell = self.ell
@@ -194,13 +195,25 @@ class PS:
                 spec = spec*ell*(ell+1)/2/np.pi
             elif not prefactor and self.prefactor:
                 spec = spec*2*np.pi/ell/(ell+1)
-            ax.plot(ell, spec, fmt, **kwargs)
+            if show_cov:
+                assert isinstance(cov, Covmat), "covmat not provided or invalid"
+                assert np.allclose(cov.ell, ell), 'ell mismatch in cov'
+                yerr = np.sqrt(cov[f'{s}{s}'])
+                if prefactor and not self.prefactor:
+                    yerr *= ell*(ell+1)/2/np.pi
+                ax.errorbar(ell, spec, yerr=yerr, fmt=fmt, **kwargs)
+            else:
+                ax.plot(ell, spec, fmt, **kwargs)
             ax.set_xlabel(r'$\ell$')
             ax.set_ylabel(spec_name)
             if logx:
                 ax.set_xscale('log')
             if logy:
                 ax.set_yscale('log')
+            if len(xlim) == 2:
+                ax.set_xlim(xlim)
+            if len(ylim) == 2:
+                ax.set_ylim(ylim)
             if legend and not legend_below:
                 ax.legend()
         plt.tight_layout()
@@ -332,6 +345,7 @@ class Covmat:
         idx1 = self.order.index(spec1)
         idx2 = self.order.index(spec2)
         return self.cov[:,idx1,idx2]
+
     @classmethod
     def from_file(cls, filename):
         with open(filename, "r") as f:
