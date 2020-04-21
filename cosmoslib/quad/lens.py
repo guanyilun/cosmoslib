@@ -35,12 +35,12 @@ def qeb_nlpp(lmax_p, clbb, clee, nleb):
 
     zeta_en33_p = gl.cf_from_cl( 3,  3, cl_en33 )
     zeta_en33_m = gl.cf_from_cl( 3, -3, cl_en33 )
-    zeta_en31_p = gl.cf_from_cl( 3, 1, cl_en31 )
+    zeta_en31_p = gl.cf_from_cl( 3,  1, cl_en31 )
     zeta_en31_m = gl.cf_from_cl( 3, -1, cl_en31 )
-    zeta_en11_p = gl.cf_from_cl( 1, 1, cl_en11 )
+    zeta_en11_p = gl.cf_from_cl( 1,  1, cl_en11 )
     zeta_en11_m = gl.cf_from_cl( 1, -1, cl_en11 )
 
-    zeta_bn22_p = gl.cf_from_cl( 2, 2, cl_bn22 )
+    zeta_bn22_p = gl.cf_from_cl( 2,  2, cl_bn22 )
     zeta_bn22_m = gl.cf_from_cl( 2, -2, cl_bn22 )
 
     nlpp_out_p = gl.cl_from_cf( lmax_p, 1, 1,
@@ -71,7 +71,7 @@ def qtt_nlpp(lmax_p, cltt, cltt, nltt):
     # common factors
     llp1 = ls*(ls+1)
     div_dl = 1/(cltt+nltt)
-    cl_div_dl = cltt/(cltt+cltt)
+    cl_div_dl = cltt/(cltt+nltt)
 
     # get zeta terms
     zeta_00   = gl.cf_from_cl(0,  0, (2*ls+1)/(4*np.pi) * div_dl)
