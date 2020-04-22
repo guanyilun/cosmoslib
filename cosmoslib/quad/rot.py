@@ -1,7 +1,51 @@
 """Reconstruction of rotational field"""
 
 import numpy as np
+import healpy as np
+
 from cosmoslib.utils.glquad import gauss_legendre_quadrature
+
+
+#----------------------------------------------------------------------
+# reconstruction of rotational field
+#
+#----------------------------------------------------------------------
+
+
+def qeb(lmax, rlmin, rlmax, fCE, Elm, Blm, alm, nside=None):
+    """Reconstructing pol rotation angle from the EB quadratic estimator.
+    adapted the fortran version in cmblensplus
+
+    Args:
+      :lmax (int)         : Maximum multipole of output lensing potential alms
+      :rlmin/rlmax (int)  : Minimum/Maximum multipole of CMB for reconstruction
+      :fCE [l] (double)   : EE spectrum, with bounds (0:rlmax)
+      :Elm [l,m] (dcmplx) : Inverse-variance filtered E-mode alm, with bounds (0:rlmax,0:rlmax)
+      :Blm [l,m] (dcmplx) : Inverse-variance filtered B-mode alm, with bounds (0:rlmax,0:rlmax)
+    Args(optional):
+      :nside (int)        : Nside for the convolution calculation, default to lmax
+    Returns:
+      :alm [l,m] (dcmplx) : Rotation angle alm, with bounds (0:lmax,0:lmax)
+
+    """
+    if not nside: nside=lmax
+    print(f"Calculating qEB rotation estimator with nside={nside}")
+    npix = 12*nside**2
+    # move alm into a right shape for alm2map_spin
+    # Blm -> Bmap
+    alm = np.zeros((2,)+Blm.shape)
+    alm[1,...] = Blm
+    Bmap = hp.alm2map_spin(alm, nside, 2, rlmax, rlmax)  # A
+    # Elm -> Emap
+    alm = np.zeros((2,)+Blm.shape)
+    alm[0,...] = hp.almxfl(Elm,fCE)  # wiener-filtering
+    Emap = hp.alm2map_spin(alm, nside, 2, rlmax, rlmax)  #A2
+    # Map-space operation
+    omap = Bmap[0]*Emap[1] - Bmap[1]*Emap[0]
+    # convert back to alm space
+    oalm = -2*hp.map2alm(omap, lmax, lmax)
+    return oalm
+
 
 #----------------------------------------------------------------------
 # rotational field reconstruction noise
