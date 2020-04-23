@@ -24,8 +24,11 @@ def plot_ps(total_ps, fmt="-", axes=None, **kwargs):
 
     return axes
 
-def set_plotstyle(options={}, style='default'):
+def set_plotstyle(style='default', options={}):
     """Define common plot style"""
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
     default = {}
     if style == 'default':
         # style from Cristobal
@@ -45,10 +48,8 @@ def set_plotstyle(options={}, style='default'):
         default['legend.fontsize'] = 18
         default['lines.linewidth'] = 2
         default['axes.prop_cycle'] = "cycler(color=['#2424f0','#df6f0e','#3cc03c','#d62728','#b467bd','#ac866b','#e397d9','#9f9f9f','#ecdd72','#77becf'])"
-    elif skyle == 's1':
+    elif style == 's1':
         "style stolen from astropaint"
-        import seaborn as sns
-        import matplotlib.pyplot as plt
 
         plt.style.use("seaborn-poster")
         default["figure.figsize"] = (6, 4)

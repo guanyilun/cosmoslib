@@ -56,7 +56,7 @@ def qeb_nlpp(lmax_p, clbb, clee, nleb):
     return 1./(np.pi/4.*(ls* (ls+1) ) * ( nlpp_out_p - nlpp_out_m ))
 
 
-def qtt_nlpp(lmax_p, cltt, cltt, nltt):
+def qtt_nlpp(lmax_p, cltt, nltt):
     """Reconstruction noise from TT estimator, refer Eq. 45-48
     in arXiv:1010.0048v2.
 

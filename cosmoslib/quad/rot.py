@@ -1,7 +1,7 @@
 """Reconstruction of rotational field"""
 
 import numpy as np
-import healpy as np
+import healpy as hp
 
 from cosmoslib.utils.glquad import gauss_legendre_quadrature
 
@@ -14,18 +14,20 @@ from cosmoslib.utils.glquad import gauss_legendre_quadrature
 
 def qeb(lmax, rlmin, rlmax, fCE, Elm, Blm, alm, nside=None):
     """Reconstructing pol rotation angle from the EB quadratic estimator.
-    adapted the fortran version in cmblensplus
+    adapted from the fortran version in cmblensplus
 
-    Args:
-      :lmax (int)         : Maximum multipole of output lensing potential alms
-      :rlmin/rlmax (int)  : Minimum/Maximum multipole of CMB for reconstruction
-      :fCE [l] (double)   : EE spectrum, with bounds (0:rlmax)
-      :Elm [l,m] (dcmplx) : Inverse-variance filtered E-mode alm, with bounds (0:rlmax,0:rlmax)
-      :Blm [l,m] (dcmplx) : Inverse-variance filtered B-mode alm, with bounds (0:rlmax,0:rlmax)
-    Args(optional):
-      :nside (int)        : Nside for the convolution calculation, default to lmax
+    Parameters:
+    -----------
+      lmax (int)         : Maximum multipole of output lensing potential alms
+      rlmin/rlmax (int)  : Minimum/Maximum multipole of CMB for reconstruction
+      fCE [l] (double)   : EE spectrum, with bounds (0:rlmax)
+      Elm [l,m] (dcmplx) : Inverse-variance filtered E-mode alm, with bounds (0:rlmax,0:rlmax)
+      Blm [l,m] (dcmplx) : Inverse-variance filtered B-mode alm, with bounds (0:rlmax,0:rlmax)
+      nside (int)        : Nside for the convolution calculation, default to lmax
+
     Returns:
-      :alm [l,m] (dcmplx) : Rotation angle alm, with bounds (0:lmax,0:lmax)
+    --------
+      alm [l,m] (dcmplx) : Rotation angle alm, with bounds (0:lmax,0:lmax)
 
     """
     if not nside: nside=lmax
@@ -51,6 +53,13 @@ def qeb(lmax, rlmin, rlmax, fCE, Elm, Blm, alm, nside=None):
 # rotational field reconstruction noise
 #
 #----------------------------------------------------------------------
+def qeb_nlaa_simple(theory, noise):
+    """Convenient wrapper of the underlying function"""
+    obs = (theory + noise).remove_prefactor()
+    lmax = obs.lmax
+    theory = theory.resample(obs.ell).remove_prefactor()
+    return qeb_nlaa(lmax, theory.EE, theory.BB, obs.EE, obs.BB)
+
 
 def qeb_nlaa(lmax_a, clee, clbb, oclee, oclbb):
     """reconstruction noise from EB"""

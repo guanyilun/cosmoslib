@@ -5,7 +5,7 @@ it doesn't do repeative calculations. I will switch to that version if
 performance becomes an issue.
 
 """
-
+import numpy as np
 from cosmoslib.utils import cwignerd
 
 

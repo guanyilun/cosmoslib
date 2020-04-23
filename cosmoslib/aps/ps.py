@@ -42,7 +42,14 @@ class PS:
     def load_arr(self, arr, order=('ell','TT','EE','BB','TE'), prefactor=True):
         """Load data from a given array"""
         if arr.shape[-1] != len(order):
-            raise ValueError("provided order doesn't match the input array!")
+            # see if we are missing ells
+            if arr.shape[-1] == len(order)-1:
+                print("Didn't find ell, generating based on the shape now...")
+                ell = np.arange(arr.shape[0])
+                arr = np.pad(arr, ((0,0),(1,0)))
+                arr[:,0] = ell
+            else:
+                raise ValueError("provided order doesn't match the input array!")
         # now populate fields
         self.order = order
         for i,c in enumerate(order):

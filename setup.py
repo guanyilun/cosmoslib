@@ -18,7 +18,8 @@ with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
 requirements = ['numpy', 'scipy', 'matplotlib',
-                'cython', 'cytoolz', 'healpy', 'configparser']
+                'cython', 'cytoolz', 'healpy', 'configparser',
+                'healpy', 'camb']
 
 cython_modules = cythonize(Extension(
     name="cosmoslib.like._likelihood",
