@@ -8,7 +8,8 @@ import numpy as np
 from scipy import interpolate
 import healpy as hp
 import pickle
-
+from functools import reduce
+import operator
 
 class PS:
     """A container for CMB power spectrum."""
@@ -723,3 +724,27 @@ def fisher_matrix(model, cov, ratio=0.01):
                 alpha[i,j] += np.einsum('i,ij,j', dCldp[i][:,l], np.linalg.inv(cov[l,:,:]), dCldp[j][:,l])
 
     return alpha, params
+
+
+def combine_noise_models(noises):
+    """Combine noise from multiple frequencies using inverse average, adapted
+    from astropaint
+
+    Parameters
+    ----------
+    noises: list of noise objects
+
+    Returns
+    -------
+    noise object with combined noise power spectrum
+    1/N_tot = 1/N1 + 1/N2 + ...
+
+    """
+    assert isinstance(Nls, (list,Noise))
+    # find a dummy noise object by adding them, we simply
+    # use this to get the ell interpolation to work
+    combined = reduce(operator.add, noises)
+    for spec in combined.specs:
+        combined.ps[spec] = np.sum([1/n.resample(combined.ell).ps[spec]
+                                    for n in noises])**-1
+    return combined
