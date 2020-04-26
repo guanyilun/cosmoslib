@@ -1,5 +1,6 @@
 from matplotlib import pyplot as plt
 import numpy as np
+from cycler import cycler
 
 def plot_ps(total_ps, fmt="-", axes=None, **kwargs):
     """Plot the power spectra"""
@@ -24,7 +25,7 @@ def plot_ps(total_ps, fmt="-", axes=None, **kwargs):
 
     return axes
 
-def set_plotstyle(style='default', options={}):
+def set_plotstyle(options={}, style='default', tex=None):
     """Define common plot style"""
     import seaborn as sns
     import matplotlib.pyplot as plt
@@ -35,22 +36,21 @@ def set_plotstyle(style='default', options={}):
         for tick in ('xtick', 'ytick'):
             default['{0}.major.size'.format(tick)] = 8
             default['{0}.minor.size'.format(tick)] = 4
-            default['{0}.major.width'.format(tick)] = 2
-            default['{0}.minor.width'.format(tick)] = 2
+            default['{0}.major.width'.format(tick)] = 1
+            default['{0}.minor.width'.format(tick)] = 1
             default['{0}.labelsize'.format(tick)] = 20
             default['{0}.direction'.format(tick)] = 'in'
         default['xtick.top'] = True
         default['ytick.right'] = True
-        default['axes.linewidth'] = 2
+        default['axes.linewidth'] = 1
         default['axes.labelsize'] = 22
         default['font.size'] = 22
         default['font.family']='sans-serif'
         default['legend.fontsize'] = 18
         default['lines.linewidth'] = 2
-        default['axes.prop_cycle'] = "cycler(color=['#2424f0','#df6f0e','#3cc03c','#d62728','#b467bd','#ac866b','#e397d9','#9f9f9f','#ecdd72','#77becf'])"
-    elif style == 's1':
-        "style stolen from astropaint"
-
+        default['axes.prop_cycle'] = cycler(color=['#2424f0','#df6f0e','#3cc03c','#d62728','#b467bd','#ac866b','#e397d9','#9f9f9f','#ecdd72','#77becf'])
+    elif style == 'ap':
+        # from astropaint
         plt.style.use("seaborn-poster")
         default["figure.figsize"] = (6, 4)
         default["text.usetex"] = True
@@ -58,12 +58,22 @@ def set_plotstyle(style='default', options={}):
         default["font.family"] = "serif"
         default['font.serif'] = 'Ubuntu'
         default["figure.dpi"]= 100
-
+    elif style == 'clp':
+        # from cmblensplus
+        default['axes.labelsize'] = 8
+        default['legend.fontsize'] = 10
+        default['xtick.labelsize'] = 10
+        default['ytick.labelsize'] = 10
+        default['text.usetex'] = False
+    else:  # try to load matplotlib internal styles
+        plt.style.use(style)
     for key in default:
         plt.rcParams[key] = default[key]
     # overwrite if necessary
     for key in options:
         plt.rcParams[key] = options[key]
+    if tex is not None:
+        plt.rcParams['text.usetex'] = tex
 
 
 class Plotter(object):

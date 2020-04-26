@@ -11,6 +11,7 @@ import pickle
 from functools import reduce
 import operator
 
+
 class PS:
     """A container for CMB power spectrum."""
     def __init__(self, arg=None, order=('ell','TT','EE','BB','TE'), prefactor=False, verbose=False):
@@ -247,7 +248,7 @@ class PS:
     def gen_sim_hp(self):
         """Generate a sim realization of the power spectra, wrapped around healpy,
         this is often 30% faster"""
-        alm = self.gen_alm()
+        alm = self.gen_alm_hp()
         cl = hp.sphtfunc.alm2cl(alm)
         ell = np.arange(cl.shape[1])
         ps = PS(cl.T, order=('TT', 'EE', 'BB', 'TE', 'EB', 'TB'), prefactor=False)
@@ -255,7 +256,7 @@ class PS:
         ps.order += ('ell',)
         return ps
 
-    def gen_alm(self):
+    def gen_alm_hp(self):
         if self.prefactor:
             self.remove_prefactor()
         # healpy requires array starts from zero, fill will 0
@@ -264,6 +265,13 @@ class PS:
         alm = hp.synalm((ps[0],ps[1],ps[2],ps[3],np.zeros_like(ps[0]),np.zeros_like(ps[0])),
                         lmax=self.lmax, verbose=False, new=True)
         return alm
+
+    def gen_map(self, nside, n=1):
+        if n > 1:
+            return [self.gen_map(nside) for i in range(n)]
+        else:
+            alm = self.gen_alm_hp(nside)
+            return hp.alm2map(alm, nside)
 
     def covmat(self, noise, f_sky=1):
         """get covariance matrix given a noise model
