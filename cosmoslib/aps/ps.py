@@ -170,7 +170,7 @@ class PS:
         else:
             return PS(self.values,self.order,prefactor=True).remove_refactor()
 
-    def resample(self, new_ell):
+    def resample(self, new_ell, **kwargs):
         ell = self.ell
         # make sure we are within interpolation range
         m = np.logical_and(new_ell<=self.lmax,new_ell>=self.lmin)
@@ -178,7 +178,7 @@ class PS:
         new_ps = PS(order=self.order,prefactor=self.prefactor)
         new_ps.ps['ell'] = new_ell[m]
         for s in self.specs:
-            new_ps.ps[s] = interpolate.interp1d(ell,self.ps[s])(new_ell[m])
+            new_ps.ps[s] = interpolate.interp1d(ell,self.ps[s],**kwargs)(new_ell[m])
         return new_ps
 
     def plot(self, fmt="-", name='C_\ell', axes=None, ncol=2,
@@ -417,7 +417,6 @@ def resample(ps, ell):
 
     return cl_predicted
 
-
 def join_noise_models(noise_models, method='min'):
     """join multiple noise models by a given method. Currently
     only method that works is the min, which means choose the
@@ -447,63 +446,6 @@ def join_noise_models(noise_models, method='min'):
             cl[idx] = nm[spec][mask]
         noise.ps[spec] = cl[noise.ell]
     return noise
-
-def N_l(ells, power_noise, beam_size, prefactor=True):
-    """Calculate the noise spectra for a given noise-level and beam size.
-
-    Args:
-        ells: 1D numpy array of ells
-        power_noise: noise per pixel in muK-rad
-        beam_size: beam size (FWHM) in unit of rad
-
-    Returns:
-        ps: len(ells) x 3 array, first column is ells
-            the second column is N_lTT the third column
-            is N_lPP.
-    """
-    NlT = power_noise**2*np.exp(ells*(ells+1)*beam_size**2/(8.*np.log(2)))
-    NlP = 2 * NlT
-
-    Nls = np.stack([ells, NlT, NlP, NlP, np.zeros(NlP.shape)], axis=1)
-    if prefactor:
-        Cl2Dl_(Nls)
-    return Nls
-
-def add_noise_nl(ps, power_noise, beam_size, l_min, l_max, prefactor=True):
-    """Add the noise term Nl to the power spectra based on the telescope noise
-    properties.
-
-    Args:
-        ps: power spectra
-        power_noise: power noise in \muK rad
-        beam_size: FWHM angular resolution of the beam in rad
-        l_min, l_max: limits of ells
-
-    Returns:
-        ps: power spectra with noises Nl added
-    """
-    ells = ps[:,0]
-
-    # calculate noise spectra
-    Nls = N_l(ells, power_noise, beam_size, prefactor=False)
-
-    new_ps = ps.copy()
-    if prefactor:
-        new_ps = remove_prefactor(new_ps)
-
-    NlT = Nls[:,1]
-    NlP = Nls[:,2]
-    new_ps[:,1] += NlT
-    new_ps[:,2] += NlP
-    new_ps[:,3] += NlP
-
-    if prefactor:
-        new_ps = add_prefactor(new_ps)
-
-    mask = np.logical_and(ells>=l_min, ells<=l_max)
-
-    return new_ps[mask,:]
-
 
 def Dl2Cl(ps, inplace=False):
     """Add the l(l+1)/2\pi prefactor in a power spectrum"""
@@ -584,84 +526,6 @@ def gen_ps_realization(ps, prefactor=True):
         return Cl2Dl(m_ps, inplace=True)
     else:
         return m_ps
-
-
-def covmat(ps, pixel_noise, beam_size, l_min,
-           l_max, f_sky, prefactor=True):
-    """Calculate the covariance matrix based on a model.
-
-    Args:
-        ps: power spectra
-        pixel_noise: noise per pixel
-        beam_size: beam size in degress (full width half minimum)
-        l_min, l_max: range of ells
-        f_sky: sky coverage fraction, 1 means full-sky coverage
-
-    Returns:
-        cov: a tensor of size [n_ell, n_ps, n_ps], for example with
-             a lmax of 5000, the tensor size will be [5000, 4, 4]
-    """
-    # assuming the beam is a gaussian beam with an ell dependent
-    # beam size
-    if prefactor:
-        remove_prefactor(ps)
-
-    _ells = ps[:, 0]
-
-    Wb = lambda l: np.exp(l*(l+1)*beam_size**2/(8.*np.log(2)))
-
-    # calculate the noise parameter w^-1
-    wTinv = pixel_noise**2
-    wPinv = 2*wTinv
-
-    mask = np.logical_and(_ells>=l_min, _ells<=l_max)
-
-    # extract power spectra
-    ells = ps[mask,0]
-    ClTT = ps[mask,1]
-    ClEE = ps[mask,2]
-    ClBB = ps[mask,3]
-    ClTE = ps[mask,4]
-
-    # initialize empty covariance tensor. Since the covariance matrix
-    # depends on ell, we will make a higher dimensional array [n_ell,
-    # n_ps, n_ps] where the first index represents different ells, the
-    # second and third parameters represents different power spectra
-    n_ells = len(ells)
-    cov = np.zeros([n_ells, 4, 4])
-
-    for (i, l) in enumerate(ells):
-        # T, T
-        cov[i,0,0] = 2.0/(2*l+1)*(ClTT[i] + wTinv*Wb(l))**2
-
-        # E, E
-        cov[i,1,1] = 2.0/(2*l+1)*(ClEE[i] + wPinv*Wb(l))**2
-
-        # B, B
-        cov[i,2,2] = 2.0/(2*l+1)*(ClBB[i] + wPinv*Wb(l))**2
-
-        # TE, TE
-        cov[i,3,3] = 1.0/(2*l+1)*(ClTE[i]**2 + (ClTT[i] + wTinv*Wb(l))
-                                  *(ClEE[i] + wPinv*Wb(l)))
-
-        # T, E
-        cov[i,0,1] = cov[i,1,0] = 2.0/(2*l+1)*ClTE[i]**2
-
-        # T, TE
-        cov[i,0,3] = cov[i,3,0] = 2.0/(2*l+1)*ClTE[i]*(ClTT[i] +
-                                                       wTinv*Wb(l))
-
-        # E, TE
-        cov[i,1,3] = cov[i,3,1] = 2.0/(2*l+1)*ClTE[i]*(ClEE[i] +
-                                                       wPinv*Wb(l))
-
-    # now we include the effect of partial sky coverage
-    cov /= f_sky
-
-    if prefactor:
-        add_prefactor(ps)
-
-    return ells, cov
 
 
 def fisher_matrix(model, cov, ratio=0.01):
