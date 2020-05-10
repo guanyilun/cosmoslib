@@ -170,7 +170,7 @@ class Cosmology(object):
         except OSError:
             self.lensedtotCls = None
 
-    def fisher_matrix(self, ells, cov, targets=[], ratio=0.01):
+    def fisher_matrix(self, covmat, targets=[], ratio=0.01, verbose=False):
         """Calculate the fisher matrix for a given covariance matrix
 
         Args:
@@ -181,6 +181,7 @@ class Cosmology(object):
         if len(targets)==0:
             raise ValueError("No targets found, what do you want?")
 
+        ells, cov = covmat.ell, covmat.cov
         model = self.model_params
 
         dCldp_list = []
@@ -188,7 +189,7 @@ class Cosmology(object):
             if not p in model.keys():
                 print("Warning: %s not found in model, skipping..." % p)
                 continue
-
+            if verbose: print(f"Varying {p}...")
             # make copies of model for variation of parameters
             new_model_m1 = model.copy()
             new_model_m2 = model.copy()
@@ -203,34 +204,38 @@ class Cosmology(object):
             new_model_p1[p] = model[p] + 0.5*h
             new_model_p2[p] = model[p] + h
 
+            if verbose: print("-> Calc m2...")
             self.set_model_params(new_model_m2)
-            ps_m2 = self.run()
+            ps_m2 = self.full_run()
 
+            if verbose: print("-> Calc m1...")
             self.set_model_params(new_model_m1)
-            ps_m1 = self.run()
+            ps_m1 = self.full_run()
 
+            if verbose: print("-> Calc p1...")
             self.set_model_params(new_model_p1)
-            ps_p1 = self.run()
+            ps_p1 = self.full_run()
 
+            if verbose: print("-> Calc p2...")
             self.set_model_params(new_model_p2)
-            ps_p2 = self.run()
+            ps_p2 = self.full_run()
 
             # calculate differenciations to p
-            dCldp = (4.0/3.0*(ps_p1[:,1:]-ps_m1[:,1:]) - 1.0/6.0*(ps_p2[:,1:]-ps_m2[:,1:]))/h
-
+            dCldp = (4.0/3.0*(ps_p1-ps_m1) - 1.0/6.0*(ps_p2-ps_m2))/h
             # interpolate it into the given ells
-            dCldp_interp = interp1d(ps_m2[:,0], dCldp.T)(ells).T
-
+            dCldp = dCldp.resample(ells).remove_prefactor()
             # store it to a list
-            f = 2*np.pi/(ells*(ells+1))[:, None]
-            dCldp_list.append(dCldp_interp*f)
+            dCldp_list.append(dCldp)
 
         n_params = len(dCldp_list)
         alpha = np.zeros([n_params, n_params])
         n_ell = cov.shape[0]
+        if verbose: print("Calc alpha...")
         for i in range(n_params):
             for j in range(n_params):
-                for l in np.arange(2, n_ell):
-                    alpha[i,j] += np.einsum('i,ij,j', dCldp_list[i][l, :], np.linalg.inv(cov[l,:,:]), dCldp_list[j][l, :])
+                for k in range(n_ell):
+                    cl_i = dCldp_list[i].values[k,1:]
+                    cl_j = dCldp_list[j].values[k,1:]
+                    alpha[i,j] += np.einsum('i,ij,j', cl_i, np.linalg.inv(cov[k,:,:]), cl_j)
 
         return alpha
