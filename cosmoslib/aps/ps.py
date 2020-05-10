@@ -114,6 +114,27 @@ class PS:
             new_ps.ps[s] = self.ps[s] - other.ps[s]
         return new_ps
 
+    def __mul__(self, other):
+        if issubclass(type(other), PS):
+            raise NotImplementedError("Currently only support number ops!")
+        new_ps = PS(order=self.order, prefactor=self.prefactor)
+        new_ps.ps['ell'] = self.ell
+        for s in self.specs:
+            new_ps.ps[s] = self.ps[s] * other
+        return new_ps
+
+    def __rmul__(self, other):
+        return self.__mul__(other)
+
+    def __truediv__(self, other):
+        if issubclass(type(other), PS):
+            raise NotImplementedError("Currently only support number ops!")
+        new_ps = PS(order=self.order, prefactor=self.prefactor)
+        new_ps.ps['ell'] = self.ell
+        for s in self.specs:
+            new_ps.ps[s] = self.ps[s] / other
+        return new_ps
+
     def __getitem__(self, field):
         if field not in self.order:
             raise ValueError(f"{field} not found!")
