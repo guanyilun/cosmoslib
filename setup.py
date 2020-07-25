@@ -21,13 +21,20 @@ requirements = ['numpy', 'scipy', 'matplotlib',
                 'cython', 'cytoolz', 'healpy', 'configparser',
                 'healpy', 'camb']
 
-cython_modules = cythonize(Extension(
-    name="cosmoslib.like._likelihood",
-    sources=["cosmoslib/like/_likelihood.pyx"],
-    include_dirs=[np.get_include()],
-    # extra_compile_args=['-fopenmp'],
-    # extra_link_args=['-fopenmp'],
-))
+cython_modules = cythonize([
+    Extension(
+        name="cosmoslib.like._likelihood",
+        sources=["cosmoslib/like/_likelihood.pyx"],
+        include_dirs=[np.get_include()],
+        # extra_compile_args=['-fopenmp'],
+        # extra_link_args=['-fopenmp'],
+    ),
+    Extension(
+        name="cosmoslib.utils.lic",
+        sources=['cosmoslib/utils/_lic.pyx'],
+        include_dirs=[np.get_include()],
+    )
+])
 
 f2py_modules = [
     Extension(
