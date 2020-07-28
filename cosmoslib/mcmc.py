@@ -5,7 +5,7 @@ import numpy as np
 import emcee
 import dill as pickle
 
-from cosmoslib.ps import Dl2Cl, resample
+from cosmoslib.aps import Dl2Cl, resample
 from cosmoslib.like import exact_likelihood
 
 

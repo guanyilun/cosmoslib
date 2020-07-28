@@ -1,5 +1,4 @@
 """utility libraries"""
-import random, string
 from cytoolz.functoolz import memoize
 
 
@@ -36,6 +35,15 @@ def load_context(path=None):
     return context
 
 
-def rand_chars(n):
-    """Generate n random characters"""
-    return ''.join(random.choice(string.ascii_letters) for x in range(n))
+# define common filepaths internally
+import os.path as op
+root_dir = op.abspath(op.join(op.dirname(__file__), '..','..'))
+data_dir = op.join(root_dir,'data')
+bbn_table = op.join(data_dir, 'BBN_full_alterBBN_880.1.dat.txt')
+lib_dir = op.join(root_dir, 'deps', 'lib')
+
+# dependency libraries
+librecfast = op.join(lib_dir, 'librecfast.so')
+if not op.exists(librecfast):
+    print("Warning: librecfast not found, recombination codes may not work!")
+    librecfast = None
