@@ -115,7 +115,6 @@ def lic_flow(vectors,len_pix=10):
             fy = 0.5
             for k in range(len_pix):
                 vx, vy = vectors[y,x]
-                print x, y, vx, vy
                 if vx>=0:
                     tx = (1-fx)/vx
                 else:
@@ -125,7 +124,6 @@ def lic_flow(vectors,len_pix=10):
                 else:
                     ty = -fy/vy
                 if tx<ty:
-                    print "x step"
                     if vx>0:
                         x+=1
                         fy+=vy*tx
@@ -135,7 +133,6 @@ def lic_flow(vectors,len_pix=10):
                         fy+=vy*tx
                         fx=1.
                 else:
-                    print "y step"
                     if vy>0:
                         y+=1
                         fx+=vx*ty
