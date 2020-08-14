@@ -5,21 +5,22 @@ import numpy as np
 import scipy.special as sp
 from scipy.special import spherical_jn
 from scipy.interpolate import CubicSpline
-from scipy.integrate import quad
+from scipy.integrate import quad, romberg
 from tqdm import tqdm
 
 #############
 # constants #
 #############
 
-e = 1.602e-19  # C
+# e = 1.602e-19  # C
+e = 0.303  # natural unit
 
 ###############################
 # transfer function for cl_aa #
 ###############################
 
 class MagneticField:
-    def __init__(self, P_k=None):
+    def __init__(self, B_lambda, n_B, lam=1, h=0.673):
         """Calculate various magnetic field related quantities here
 
         Parameters
@@ -27,7 +28,17 @@ class MagneticField:
         P_k: 2-pt correlation function of magnetic field (vectorized func of k)
 
         """
-        self.P_k = P_k
+        self.B_lambda = B_lambda
+        self.n_B = n_B
+        self.lam = lam
+        self.h = h
+        # compute amplitude
+        # Eq. (100) from arxiv 0911.2714. With an additional factor of 0.5 to match
+        # the convention used in other papers such as Kosowsky (2005) and Pagosian (2013)
+        # k_lambda = 2*np.pi / lam
+        # A = (2*np.pi)**(n_B+5)*B_lambda**2 / (2*sp.gamma((n_B+3)/2)*k_lambda**(n_B+3))
+        # same expression but simplified
+        self.A = (2*np.pi)**2*B_lambda**2 / (2*sp.gamma((n_B+3)/2)) * lam**(n_B+3)
 
     def delta_m2(self, k, lam0):
         """Calculate \Delta_M^2 following Eq. (12)
@@ -40,17 +51,29 @@ class MagneticField:
         """
         return k**3*self.P_k(k)*(3*lam0**2/(16*np.pi**2*e))**2
 
-    def set_pk(self, B_lambda, n_B):
-        """Set the primordial magnetic field power spectrum based on an
+    def P_k(self, k):
+        """find the primordial magnetic field power spectrum based on an
         amplitude and spectral index
-
-        Eq. (100) from arxiv 0911.2714
+        Parameters
+        ----------
+        k (np.ndarray): wavenumbers of interests
 
         """
-        k_lambda = 1  # FIXME: placeholder
-        A = (2*np.pi)*(n_B+5)*B_lambda**2 / (sp.gamma((n_B+3)/2)*k_lambda**(n_B+3))
-        self.P_k = lambda k: A*k**n_B
+        kD = self.kDissip()
+        Pk = np.zeros_like(k, dtype=np.double)
+        Pk[k<kD] = self.A*k**self.n_B
+        return Pk
 
+    def kDissip(self):
+        """
+        Returns
+        -------
+        kD: in unit of Mpc^-1
+
+        """
+        k_lambda = 2*np.pi / self.lam
+        kD = 2.9e4 * self.B_lambda**(-2) * k_lambda**(self.n_B+3) * self.h
+        return kD
 
 class ClaaTransferFunction:
     def __init__(self, cosmo=None, mag=None, verbose=True):
@@ -101,11 +124,12 @@ class ClaaTransferFunction:
         eta_0 = self.cosmo.tau0  # comoving time today
         eta_star = self.cosmo.tau_maxvis  # comoving time at maximum of visibility
         etas_ = np.linspace(eta_star, eta_0, n_eta)  # flat array
+        if self.verbose: print(f"-> Eta integrated from {eta_0:.1f} to {eta_star:.1f}")
         k_ = k  # alias to be consistent
         Tlks_list = []  # to store Tlk for each part
         ells_list = []
         # define a combined operation of splined integration using
-        spline_int = lambda x: quad(CubicSpline(etas_, x), eta_star, eta_0)[0]
+        spline_int = lambda x: quad(CubicSpline(etas_, x), eta_star, eta_0, epsrel=1e-4)[0]
         for i in tqdm(range(len(ells_parts))):
             ells_ = ells_parts[i]
             # allocate each array to a seperate axis so broadcasting works properly
@@ -167,7 +191,60 @@ class ClaaTransferFunction:
         integrand *= self.mag.delta_m2(np.exp(logk), lam0)
         del Tm1, Tp1, T1
         # make a spline interpolator to be used for integration from logk to integrand
-        spline_int = lambda x: quad(CubicSpline(logk_, x), np.log(kmin), np.log(kmax))[0]
+        spline_int = lambda x: romberg(CubicSpline(logk_, x), np.log(kmin), np.log(kmax))
         claa = 2/np.pi*np.apply_along_axis(spline_int, -1, integrand)
         del integrand
         return ells_, claa.ravel()
+
+def jn_first_zero(n):
+    """Get an approximated location for the first zero of
+    spherical bessel's function at a given order n"""
+    precomputed = [3.14159, 4.49341, 5.76346, 6.98793, 8.18256, 9.35581, 10.5128,
+                   11.657, 12.7908, 13.9158, 15.0335, 16.1447, 17.2505, 18.3513,
+                   19.4477, 20.5402, 21.6292, 22.715, 23.7978, 24.878, 25.9557,
+                   27.0311, 28.1043, 29.1756, 30.245, 31.3127]
+    try: return precomputed[n]
+    except:
+        # formula 9.5.14 in Handbook of Mathematical Functions
+        v = n + 0.5
+        return v + 1.8557571*v**(1/3) + 1.033150*v**(-1/3) - \
+            0.00397*v**(-1) - 0.0908*v**(-5/3) + 0.043*v**(-7/3)
+
+
+class KosowskyClaa:
+    def __init__(self, lmax, cosmo, mag):
+        """Calculate Cl^aa using approximation formula in Kosowsky (2005)
+
+        Parameters
+        ----------
+        lmax: maximum ell to calculate
+        cosmo: camb cosmology class
+        mag: magnetic field class
+        """
+        self.lmax = lmax
+        self.cosmo = cosmo
+        self.mag = mag
+
+    def claa(self, nx1=1000, nx2=1000, spl=CubicSpline):
+        eta_0 = self.cosmo.tau0  # comoving time today
+        eta_star = self.cosmo.tau_maxvis
+        kD = self.mag.kDissip()
+        xd = kD * eta_0
+        ells = np.arange(0, self.lmax+1)
+        clas = np.zeros_like(ells, dtype=np.double)
+        # perform exact calculate before x = x_approx
+        for i, l in tqdm(enumerate(ells)):
+            x_approx = min(jn_first_zero(l),xd)  # approximation
+            x = np.linspace(0, x_approx, nx1)[1:]
+            integrand = x**self.mag.n_B
+            integrand *= spherical_jn(l, x)**2
+            # start to make approximation after x = x_approx with j_l^2 -> 1/(2x^2)
+            clas[i] = quad(spl(x, integrand), 0, x_approx)[0]
+            if xd > x_approx:
+                x = np.linspace(x_approx, xd, nx2)
+                integrand = x**self.mag.n_B
+                integrand *= 1/(2*x**2)
+                clas[i] += quad(spl(x, integrand), x_approx, xd)[0]
+        # reuse some numbers in mag.A
+        clas *= 9*ells*(ells+1)/(8*np.pi*e**2)*self.mag.A / eta_0**(self.mag.n_B+3)
+        return ells, clas

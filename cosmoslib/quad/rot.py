@@ -72,7 +72,7 @@ def qeb_nlaa(lmax_a, clee, clbb, oclee, oclbb):
     assert( lmax_a >= 1 )
     assert( lmax_b <= (lmax_e+lmax_a-1) )
 
-    gl = gauss_legendre_quadrature( int((lmax_e + lmax_a + lmax_b)*0.5)+1 )
+    gl = gauss_legendre_quadrature(int((lmax_e + lmax_a + lmax_b)*0.5) + 1)
 
     ls = np.arange(0, lmax_e+1, dtype=np.double)
     WA = (2*ls+1)/(4*np.pi) * (1./oclee)
