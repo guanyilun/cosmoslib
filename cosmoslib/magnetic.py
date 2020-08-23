@@ -8,6 +8,7 @@ from scipy.interpolate import CubicSpline
 from scipy.integrate import quad, romberg
 from tqdm import tqdm
 from cosmoslib.units import natural as u
+from cosmoslib.utils.glquad import gauss_legendre_quadrature
 
 ###############################
 # transfer function for cl_aa #
@@ -200,6 +201,13 @@ def jn_first_zero(n):
         return v + 1.8557571*v**(1/3) + 1.033150*v**(-1/3) - \
             0.00397*v**(-1) - 0.0908*v**(-5/3) + 0.043*v**(-7/3)
 
+def jn_second_zero(n):
+    """Get an approximated location for the first zero of
+    spherical bessel's function at a given order n"""
+    # formula 9.5.14 in Handbook of Mathematical Functions
+    v = n + 0.5
+    return v + 3.2446076*v**(1/3) + 3.1582436*v**(-1/3) - \
+        0.083307*v**(-1) - 0.84367*v**(-5/3) + 0.8639*v**(-7/3)
 
 class KosowskyClaa:
     def __init__(self, lmax, cosmo, mag):
@@ -223,17 +231,15 @@ class KosowskyClaa:
         """
         v_0 = freq * u.GHz
         eta_0 = self.cosmo.tau0  # comoving time today
-        eta_maxvis = self.cosmo.tau_maxvis  # comoving time today
         # kD = self.mag.kDissip()
         kD = 2  # following Kosowsky 2005
-        xd = kD
+        xd = kD*eta_0
         ells = np.arange(0, self.lmax+1)
         clas = np.zeros_like(ells, dtype=np.double)
         # perform exact calculate before x = x_approx
         for i in tqdm(range(len(ells))):
             l = ells[i]
-            x_approx = min(jn_first_zero(l),xd)  # approximation
-            # x_approx = xd  # approximation
+            x_approx = min(jn_second_zero(l),xd)  # approximation
             x = np.linspace(0, x_approx, nx1)[1:]
             integrand = x**self.mag.n_B
             integrand *= spherical_jn(l, x)**2
@@ -250,3 +256,38 @@ class KosowskyClaa:
         # 4 pi alpha= e^2 convention
         # clas *= 9*ells*(ells+1)/(8*(np.pi)**3*u.e**2) * self.mag.A / eta_0**(self.mag.n_B+3) / (v_0**4)
         return ells, clas
+
+
+def clbb_from_claa(lmax_b, clee, claa):
+    """Calculate ClBB from Faraday's rotation based on an input rotational
+    power spectrum. It is assumed that the power spectra input starts from ell=0
+
+    Parameters
+    ----------
+    lmax_b: lmax for ClBB
+    clee: ClEE power spectrum
+    claa: Cl^\alpha\alpha power spectrum (rotational power spectrum)
+
+    Returns
+    -------
+    clbb
+
+    """
+    lmax_e = len(clee) - 1
+    lmax_a = len(claa) - 1
+
+    # not sure about these asserts
+    assert(lmax_e >= 2)
+    assert(lmax_a >= 2)
+    assert(lmax_b <= (lmax_e+lmax_a-1))
+
+    gl = gauss_legendre_quadrature(int((lmax_e + lmax_a + lmax_b)*0.5) + 1)
+
+    ls = np.arange(0, lmax_a+1, dtype=np.double)
+    zeta_00 = gl.cf_from_cl(0, 0, (2*ls+1)*claa)
+
+    ls = np.arange(0, lmax_e+1, dtype=np.double)
+    zeta_m2m2 = gl.cf_from_cl(-2, -2, (2*ls+1)*clee)
+
+    clbb = 1 / np.pi * gl.cl_from_cf(lmax_b, 2, 2, zeta_00 * zeta_m2m2)
+    return clbb
