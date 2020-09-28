@@ -3,10 +3,13 @@
 
 """The setup script."""
 
-from setuptools import setup, find_packages
-from distutils.extension import Extension
-from Cython.Build import cythonize
+from setuptools import find_packages
+# for building fortran packages
+from numpy.distutils.core import setup, Extension
 import numpy as np
+# for building cython packages
+from Cython.Build import cythonize
+
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()
@@ -15,7 +18,32 @@ with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
 requirements = ['numpy', 'scipy', 'matplotlib',
-                'cython', 'cytoolz', 'healpy', 'configparser']
+                'cython', 'cytoolz', 'healpy', 'configparser',
+                'healpy', 'camb']
+
+cython_modules = cythonize([
+    Extension(
+        name="cosmoslib.like._likelihood",
+        sources=["cosmoslib/like/_likelihood.pyx"],
+        include_dirs=[np.get_include()],
+        # extra_compile_args=['-fopenmp'],
+        # extra_link_args=['-fopenmp'],
+    ),
+    Extension(
+        name="cosmoslib.utils.lic",
+        sources=['cosmoslib/utils/_lic.pyx'],
+        include_dirs=[np.get_include()],
+    )
+])
+
+f2py_modules = [
+    Extension(
+        name='cosmoslib.utils.cwignerd',
+        sources=['deps/src/wignerd/wignerd.pyf','deps/src/wignerd/wignerd.c']
+    )
+]
+
+ext_modules = cython_modules + f2py_modules
 
 setup(
     author="Yilun Guan",
@@ -39,13 +67,5 @@ setup(
     url='https://github.com/guanyilun/cosmoslib',
     version='0.1.0',
     zip_safe=False,
-    ext_modules=cythonize([
-        Extension(
-            name="cosmoslib.like._likelihood",
-            sources=["cosmoslib/like/_likelihood.pyx"],
-            include_dirs=[np.get_include()],
-            # extra_compile_args=['-fopenmp'],
-            # extra_link_args=['-fopenmp'],
-        )
-    ])
+    ext_modules=ext_modules
 )
