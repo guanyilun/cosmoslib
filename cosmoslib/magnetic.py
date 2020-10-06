@@ -251,20 +251,14 @@ class KosowskyClaa:
             l = ells[i]
             # x_approx = xd  # no approximation
             x_approx = min(jn_second_zero(l),xd)  # approximation
-
-            # integrand = x**self.mag.n_B
-            # integrand *= spherical_jn(l, x)**2
-            # integrand *= jl(l, x)**2
             x = np.linspace(0, x_approx, nx, dtype=dtype)[1:]
             integrand = x**self.mag.n_B * jl(l, x)**2
-            # start to make approximation after x = x_approx with j_l^2 -> 1/(2x^2)
-            # clas[i] = quad(spl(x, integrand), 0, x_approx, limit=1000, epsrel = 1e-7)[0] + remainder(xd) - remainder(x_approx)
             # clas[i] = integrate.chebyshev(spl(x, integrand), 0, x_approx, epsrel=1e-12, epsabs=1e-16) + remainder(xd) - remainder(x_approx)
             clas[i] = integrate.romberg(spl(x, integrand), 0, x_approx, epsrel=1e-12, epsabs=1e-16) + remainder(xd) - remainder(x_approx)
+            # try the actual function instead of spline
             # f = lambda x_: x_**self.mag.n_B * jl(l, x_)**2
             # clas[i] = integrate.chebyshev(f, 1e-4, x_approx)
-            # try the actual function instead of spline
-            # clas[i] = quad(f, 0, x_approx, limit=1000, epsrel = 1e-7)[0] + remainder(xd) - remainder(x_approx)
+
         # reuse some numbers in mag.A
         # alpha=e^2 convention
         clas *= 9*ells*(ells+1)/(4*(2*np.pi)**5*u.e**2) * self.mag.A / eta_0**(self.mag.n_B+3) / (v_0**4)
