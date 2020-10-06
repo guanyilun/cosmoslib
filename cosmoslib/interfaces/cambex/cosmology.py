@@ -9,8 +9,8 @@ with python otherwise, such as for legecy codes that modify camb.
 from .cambex import CambSession
 from scipy.interpolate import interp1d
 import numpy as np
-from cosmoslib.utils import load_context
-from cosmoslib.ps import PS
+from cosmoslib.utils.context import load_context
+from cosmoslib.aps import PS
 
 
 class Cosmology(object):

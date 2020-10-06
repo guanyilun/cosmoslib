@@ -2,10 +2,10 @@ from matplotlib import pyplot as plt
 import numpy as np
 from cycler import cycler
 
-def plot_ps(total_ps, fmt="-", axes=None, **kwargs):
+def plot_ps(total_ps, fmt="-", axes=None, figsize=(12,9), **kwargs):
     """Plot the power spectra"""
     if not np.any(axes):
-        fig, axes = plt.subplots(2,2,figsize=(12,9))
+        fig, axes = plt.subplots(2,2,figsize=figsize)
 
     if total_ps.shape[-1] == 5:
         axes[0,0].loglog(total_ps[:,0],total_ps[:,1], fmt, **kwargs)
@@ -25,29 +25,32 @@ def plot_ps(total_ps, fmt="-", axes=None, **kwargs):
 
     return axes
 
-def set_plotstyle(style='default', options={}, tex=None):
+def set_plotstyle(style='default', options={}, tex=None, format_axis=True):
     """Define common plot style"""
     import seaborn as sns
     import matplotlib.pyplot as plt
 
     default = {}
-    if style == 'default':
-        # style from Cristobal
+    if format_axis:
         for tick in ('xtick', 'ytick'):
             default['{0}.major.size'.format(tick)] = 8
             default['{0}.minor.size'.format(tick)] = 4
             default['{0}.major.width'.format(tick)] = 1
             default['{0}.minor.width'.format(tick)] = 1
-            default['{0}.labelsize'.format(tick)] = 20
             default['{0}.direction'.format(tick)] = 'in'
         default['xtick.top'] = True
         default['ytick.right'] = True
         default['axes.linewidth'] = 1
+        default['lines.linewidth'] = 2
+        default["figure.dpi"]= 100
+    if style == 'default':
+        # style from Cristobal
+        for tick in ('xtick', 'ytick'):
+            default['{0}.labelsize'.format(tick)] = 20
         default['axes.labelsize'] = 22
         default['font.size'] = 22
         default['font.family']='sans-serif'
         default['legend.fontsize'] = 18
-        default['lines.linewidth'] = 2
         default['axes.prop_cycle'] = cycler(color=['#2424f0','#df6f0e','#3cc03c','#d62728','#b467bd','#ac866b','#e397d9','#9f9f9f','#ecdd72','#77becf'])
     elif style == 'ap':
         # from astropaint
@@ -55,9 +58,9 @@ def set_plotstyle(style='default', options={}, tex=None):
         default["figure.figsize"] = (6, 4)
         default["text.usetex"] = True
         default["font.size"] = 16
-        default["font.family"] = "serif"
-        default['font.serif'] = 'Ubuntu'
-        default["figure.dpi"]= 100
+        default["font.family"] = "sans-serif"
+        # default['font.serif'] = 'Ubuntu'
+        # default["figure.dpi"]= 100
     elif style == 'clp':
         # from cmblensplus
         default['axes.labelsize'] = 8
