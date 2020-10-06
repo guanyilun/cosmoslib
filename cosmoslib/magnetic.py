@@ -9,6 +9,8 @@ from scipy.integrate import quad, romberg
 from tqdm import tqdm
 from cosmoslib.units import natural as u
 from cosmoslib.utils.glquad import gauss_legendre_quadrature
+from cosmoslib.utils.sphbessel import jl
+from cosmoslib.utils import integrate
 
 ###############################
 # transfer function for cl_aa #
@@ -34,6 +36,8 @@ class MagneticField:
         # k_lambda = 2*np.pi / lam
         # self.A = (2*np.pi)**(n_B+5)*(B_lambda*u.nG)**2 / (2*sp.gamma((n_B+3)/2)*k_lambda**(n_B+3))
         # same expression but simplified
+        # self.A = (2*np.pi)**2*(B_lambda*u.nG)**2 / (2*sp.gamma((n_B+3)/2)) * lam**(n_B+3)
+        # self.A = (2*np.pi)**2*(B_lambda*u.nG)**2 / (2*sp.gamma((n_B+3)/2)) * lam**(n_B+3)
         self.A = (2*np.pi)**2*(B_lambda*u.nG)**2 / (2*sp.gamma((n_B+3)/2)) * lam**(n_B+3)
 
     def delta_m2(self, k, freq):
@@ -69,9 +73,9 @@ class MagneticField:
         """
         k_lambda = 2*np.pi / self.lam
         # version from Planck 2015
-        kD = 5.5e4 * self.B_lambda**(-2) * k_lambda**(self.n_B+3) * self.h
+        # kD = 5.5e4 * self.B_lambda**(-2) * k_lambda**(self.n_B+3) * self.h
         # version from Kosowsky 2005
-        # kD = 2.9e4 * self.B_lambda**(-2) * k_lambda**(self.n_B+3) * self.h
+        kD = 2.9e4 * self.B_lambda**(-2) * k_lambda**(self.n_B+3) * self.h
         kD = kD**(1/(self.n_B+5))
         return kD
 
@@ -209,6 +213,7 @@ def jn_second_zero(n):
     return v + 3.2446076*v**(1/3) + 3.1582436*v**(-1/3) - \
         0.083307*v**(-1) - 0.84367*v**(-5/3) + 0.8639*v**(-7/3)
 
+
 class KosowskyClaa:
     def __init__(self, lmax, cosmo, mag):
         """Calculate Cl^aa using approximation formula in Kosowsky (2005)
@@ -218,38 +223,48 @@ class KosowskyClaa:
         lmax: maximum ell to calculate
         cosmo: camb cosmology class
         mag: magnetic field class
+
         """
         self.lmax = lmax
         self.cosmo = cosmo
         self.mag = mag
 
-    def claa(self, nx1=1000, nx2=1000, freq=100, spl=CubicSpline):
+    def claa(self, nx=1000, freq=100, spl=CubicSpline, dtype=np.double):
         """
         Parameters
         ----------
         freq: frequency of interests in GHz
         """
         v_0 = freq * u.GHz
-        eta_0 = self.cosmo.tau0  # comoving time today
+        h = self.cosmo.hubble_parameter(0)/100  # hubble h today
+        eta_0 = self.cosmo.tau0 * h  # comoving time today
         # kD = self.mag.kDissip()
         kD = 2  # following Kosowsky 2005
         xd = kD*eta_0
-        ells = np.arange(0, self.lmax+1)
-        clas = np.zeros_like(ells, dtype=np.double)
+        ells = np.arange(0, self.lmax+1, dtype=dtype)
+        clas = np.zeros_like(ells, dtype=dtype)
         # perform exact calculate before x = x_approx
+        # and after that use the approximation that \int f(x) j_l^2 -> \int 1/2 f(x) 1/x^2
+        if self.mag.n_B == 1: remainder = lambda y: 0.5*np.log(y)
+        else: remainder = lambda y: 0.5*y**(self.mag.n_B-1) / (self.mag.n_B-1)
         for i in tqdm(range(len(ells))):
             l = ells[i]
+            # x_approx = xd  # no approximation
             x_approx = min(jn_second_zero(l),xd)  # approximation
-            x = np.linspace(0, x_approx, nx1)[1:]
-            integrand = x**self.mag.n_B
-            integrand *= spherical_jn(l, x)**2
+
+            # integrand = x**self.mag.n_B
+            # integrand *= spherical_jn(l, x)**2
+            # integrand *= jl(l, x)**2
+            x = np.linspace(0, x_approx, nx, dtype=dtype)[1:]
+            integrand = x**self.mag.n_B * jl(l, x)**2
             # start to make approximation after x = x_approx with j_l^2 -> 1/(2x^2)
-            clas[i] = quad(spl(x, integrand), 0, x_approx)[0]
-            if xd > x_approx:
-                x = np.linspace(x_approx, xd, nx2)
-                integrand = x**self.mag.n_B
-                integrand *= 1/(2*x**2)
-                clas[i] += quad(spl(x, integrand), x_approx, xd)[0]
+            # clas[i] = quad(spl(x, integrand), 0, x_approx, limit=1000, epsrel = 1e-7)[0] + remainder(xd) - remainder(x_approx)
+            # clas[i] = integrate.chebyshev(spl(x, integrand), 0, x_approx, epsrel=1e-12, epsabs=1e-16) + remainder(xd) - remainder(x_approx)
+            clas[i] = integrate.romberg(spl(x, integrand), 0, x_approx, epsrel=1e-12, epsabs=1e-16) + remainder(xd) - remainder(x_approx)
+            # f = lambda x_: x_**self.mag.n_B * jl(l, x_)**2
+            # clas[i] = integrate.chebyshev(f, 1e-4, x_approx)
+            # try the actual function instead of spline
+            # clas[i] = quad(f, 0, x_approx, limit=1000, epsrel = 1e-7)[0] + remainder(xd) - remainder(x_approx)
         # reuse some numbers in mag.A
         # alpha=e^2 convention
         clas *= 9*ells*(ells+1)/(4*(2*np.pi)**5*u.e**2) * self.mag.A / eta_0**(self.mag.n_B+3) / (v_0**4)
