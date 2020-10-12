@@ -53,20 +53,18 @@ def qeb(lmax, rlmin, rlmax, fCE, Elm, Blm, alm, nside=None):
 # rotational field reconstruction noise
 #
 #----------------------------------------------------------------------
-def qeb_nlaa_simple(theory, noise):
+def qeb_nlaa_simple(theory, noise, rlmin, rlmax):
     """Convenient wrapper of the underlying function"""
     obs = (theory + noise).remove_prefactor()
     lmax = obs.lmax
     theory = theory.resample(obs.ell).remove_prefactor()
-    return qeb_nlaa(lmax, theory.EE, theory.BB, obs.EE, obs.BB)
+    return qeb_nlaa(lmax, rlmin, rlmax, theory.EE, theory.BB, obs.EE, obs.BB)
 
 
-def qeb_nlaa(lmax_a, clee, clbb, oclee, oclbb):
+def qeb_nlaa(lmax_a, rlmin, rlmax, clee, clbb, oclee, oclbb):
     """reconstruction noise from EB"""
-
     lmax_e = len(clee) - 1
     lmax_b = len(clbb) - 1
-
     assert(lmax_b >= 2)
     assert(lmax_e >= 2)
     assert(lmax_a >= 1)
@@ -74,10 +72,14 @@ def qeb_nlaa(lmax_a, clee, clbb, oclee, oclbb):
 
     gl = gauss_legendre_quadrature(int((lmax_e + lmax_a + lmax_b)*0.5) + 1)
 
-    ls = np.arange(0, lmax_e+1, dtype=np.double)
-    WA = (2*ls+1)/(4*np.pi) * (1./oclee)
-    ls = np.arange(0, lmax_b+1, dtype=np.double)
-    WB = (2*ls+1)/(4*np.pi) * (clbb**2/oclbb)
+    ls_e = np.arange(0, lmax_e+1, dtype=np.double)
+    ls_b = np.arange(0, lmax_b+1, dtype=np.double)
+    # ell mask to select ells modes used to reconstruction
+    m_b = (ls_b >= rlmin) * (ls_b <= rlmax)
+    m_e = (ls_e >= rlmin) * (ls_e <= rlmax)
+
+    WA = (2*ls_b[m_b]+1)/(4*np.pi) * (1./oclbb[m_b])
+    WB = (2*ls_e[m_b]+1)/(4*np.pi) * (clee[m_e]**2/oclee[m_e])
 
     zeta_A_22_p = gl.cf_from_cl(2,  2, WA)
     zeta_A_22_m = gl.cf_from_cl(2, -2, WA)
@@ -87,5 +89,26 @@ def qeb_nlaa(lmax_a, clee, clbb, oclee, oclbb):
     nlaa = gl.cl_from_cf(lmax_a, 0, 0,
                          zeta_A_22_p*zeta_B_22_p +
                          zeta_A_22_m*zeta_B_22_m)
+
+    # if there's b-mode, two more terms are needed
+    if np.sum(clbb) != 0:
+        WA = (2*ls_e[m_e]+1)/(4*np.pi) * (1./oclee[m_e])
+        WB = (2*ls_b[m_b]+1)/(4*np.pi) * (clbb[m_b]**2/oclbb[m_b])
+        zeta_A_22_p = gl.cf_from_cl(2,  2, WA)
+        zeta_A_22_m = gl.cf_from_cl(2, -2, WA)
+        zeta_B_22_p = gl.cf_from_cl(2,  2, WB)
+        zeta_B_22_m = gl.cf_from_cl(2, -2, WB)
+        nlaa += gl.cl_from_cf(lmax_a, 0, 0,
+                              zeta_A_22_p*zeta_B_22_p +
+                              zeta_A_22_m*zeta_B_22_m)
+        WA = (2*ls_e[m_e]+1)/(4*np.pi) * (clee[m_e]/oclee[m_e])
+        WB = (2*ls_b[m_b]+1)/(4*np.pi) * (clbb[m_b]/oclbb[m_b])
+        zeta_A_22_p = gl.cf_from_cl(2,  2, WA)
+        zeta_A_22_m = gl.cf_from_cl(2, -2, WA)
+        zeta_B_22_p = gl.cf_from_cl(2,  2, WB)
+        zeta_B_22_m = gl.cf_from_cl(2, -2, WB)
+        nlaa += -2*gl.cl_from_cf(lmax_a, 0, 0,
+                                 zeta_A_22_p*zeta_B_22_p +
+                                 zeta_A_22_m*zeta_B_22_m)
 
     return 1./(4*np.pi*nlaa)
