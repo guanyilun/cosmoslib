@@ -298,5 +298,5 @@ def clbb_from_claa(lmax_b, clee, claa):
     ls = np.arange(0, lmax_e+1, dtype=np.double)
     zeta_m2m2 = gl.cf_from_cl(-2, -2, (2*ls+1)*clee)
 
-    clbb = 1 / np.pi * gl.cl_from_cf(lmax_b, 2, 2, zeta_00 * zeta_m2m2)
+    clbb = 1 / np.pi * gl.cl_from_cf(lmax_b, 2, 2, zeta_00 * zeta_m2m2) / 2
     return clbb
