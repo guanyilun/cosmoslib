@@ -650,3 +650,79 @@ def combine_noise_models(noises):
         combined.ps[spec] = np.sum([1/n.resample(combined.ell).ps[spec]
                                     for n in noises])**-1
     return combined
+
+
+def covmat_full(ps, noise, f_sky=1):
+    """aim to replace the covmat in cosmoslib.aps.PS class because
+    that does not support adding EB, TB correlations. It assumes
+    that the input spectrum has order ['ell','TT','EE','BB','TE','TB','EB']
+
+    """
+    ps = ps.resample(noise.ell)
+    order = ['ell','TT','EE','BB','TE','TB','EB']
+    ell, ClTT, ClEE, ClBB, ClTE, ClTB, ClEB = [ps.ps[spec] for spec in order]
+    new_noise = noise.resample(ell)
+    NlTT, NlEE, NlBB, NlTE = [new_noise.ps[spec] for spec in ['TT','EE','BB','TE']]
+    n_ells = len(ell)
+    cov = np.zeros([n_ells, 6, 6])
+    # TTTT = TT,TT x 2
+    cov[:,0,0] = 2/(2*ell+1)*(ClTT+NlTT)**2
+    # EEEE = EE,EE x 2
+    cov[:,1,1] = 2/(2*ell+1)*(ClEE+NlEE)**2
+    # BBBB = BB,BB x 2
+    cov[:,2,2] = 2/(2*ell+1)*(ClBB+NlBB)**2
+    # TETE = TT,EE + TE,TE
+    cov[:,3,3] = 1/(2*ell+1)*(ClTE**2+(ClTT+NlTT)*(ClEE+NlEE))
+    # TBTB = TT,BB + TB,TB
+    cov[:,4,4] = 1/(2*ell+1)*(ClTB**2+(ClTT+NlTT)*(ClBB+NlBB))
+    # EBEB = EE,BB + EB,EB
+    cov[:,5,5] = 1/(2*ell+1)*(ClEB**2+(ClEE+NlEE)*(ClBB+NlBB))
+    # TTEE = TE,TE x2
+    cov[:,0,1] = 2/(2*ell+1)*ClTE**2
+    cov[:,1,0] = 2/(2*ell+1)*ClTE**2
+    # TTBB = TB,TB x 2
+    cov[:,0,2] = 2/(2*ell+1)*ClTB**2
+    cov[:,2,0] = 2/(2*ell+1)*ClTB**2
+    # TTTE = TT,TE x 2
+    cov[:,0,3] = 2/(2*ell+1)*ClTE*(ClTT+NlTT)
+    cov[:,3,0] = 2/(2*ell+1)*ClTE*(ClTT+NlTT)
+    # TTTB = TT,TB x 2
+    cov[:,0,4] = 2/(2*ell+1)*ClTB*(ClTT+NlTT)
+    cov[:,4,0] = 2/(2*ell+1)*ClTB*(ClTT+NlTT)
+    # TTEB = TE,TB x 2
+    cov[:,0,5] = 2/(2*ell+1)*ClTE*ClTB
+    cov[:,5,0] = 2/(2*ell+1)*ClTE*ClTB
+    # EEBB = EB,EB x 2
+    cov[:,1,2] = 2/(2*ell+1)*ClEB**2
+    cov[:,2,1] = 2/(2*ell+1)*ClEB**2
+    # EETE = TE,EE x 2
+    cov[:,1,3] = 2/(2*ell+1)*ClTE*(ClEE+NlEE)
+    cov[:,3,1] = 2/(2*ell+1)*ClTE*(ClEE+NlEE)
+    # EETB = TE,EB x 2
+    cov[:,1,4] = 2/(2*ell+1)*ClTE*ClEB
+    cov[:,4,1] = 2/(2*ell+1)*ClTE*ClEB
+    # EEEB = EE,EB x 2
+    cov[:,1,5] = 2/(2*ell+1)*ClTE*ClEB
+    cov[:,5,1] = 2/(2*ell+1)*ClTE*ClEB
+    # BBTE = TB,EB x 2
+    cov[:,2,3] = 2/(2*ell+1)*ClTB*ClEB
+    cov[:,3,2] = 2/(2*ell+1)*ClTB*ClEB
+    # BBTB = TB,BB x 2
+    cov[:,2,4] = 2/(2*ell+1)*ClTB*(ClBB+NlBB)
+    cov[:,4,2] = 2/(2*ell+1)*ClTB*(ClBB+NlBB)
+    # BBEB = EB,BB x 2
+    cov[:,2,5] = 2/(2*ell+1)*ClEB*(ClBB+NlBB)
+    cov[:,5,2] = 2/(2*ell+1)*ClEB*(ClBB+NlBB)
+    # TETB = TT,EB + TB,TE
+    cov[:,3,4] = 1/(2*ell+1)*(ClEB*(ClTT+NlTT)+ClTB*ClTE)
+    cov[:,4,3] = 1/(2*ell+1)*(ClEB*(ClTT+NlTT)+ClTB*ClTE)
+    # TEEB = TE,EB + TB,EE
+    cov[:,3,5] = 1/(2*ell+1)*(ClTB*(ClEE+NlEE)+ClEB*ClTE)
+    cov[:,5,3] = 1/(2*ell+1)*(ClTB*(ClEE+NlEE)+ClEB*ClTE)
+    # TBEB = TE,BB + TB,EB
+    cov[:,4,5] = 1/(2*ell+1)*(ClTE*(ClBB+NlBB)+ClEB*ClTB)
+    cov[:,5,4] = 1/(2*ell+1)*(ClTE*(ClBB+NlBB)+ClEB*ClTB)
+    # now we include the effect of partial sky coverage
+    cov /= f_sky
+    covmat = Covmat(ell, cov, order=order[1:])
+    return covmat
