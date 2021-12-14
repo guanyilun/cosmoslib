@@ -202,16 +202,16 @@ class PS:
             new_ps.ps[s] = interpolate.interp1d(ell,self.ps[s],**kwargs)(new_ell[m])
         return new_ps
 
-    def plot(self, fmt="-", name='C_\ell', axes=None, ncol=2,
-             legend=True, legend_below=True, filename=None,
-             prefactor=True, logx=True, logy=True, show_cov=False,
-             cov=None, xlim=[], ylim=[], **kwargs):
+    def plot(self, fmt="-", name='C_\ell', axes=None, ncol=2, figsize=(12,9),
+             legend=False, legend_below=True, anchor=(0.6,-0.2), filename=None, 
+             prefactor=True, logx=True, logy=True, show_cov=False, loc='best',
+             cov=None, xlim=[], ylim=[], show_abs=True, tight=True, **kwargs):
         """Plot the power spectra"""
         import matplotlib.pyplot as plt
         ell = self.ell
         nrow = int(np.ceil(len(self.specs)/ncol))
         if not np.any(axes):
-            fig, axes = plt.subplots(nrow, ncol,figsize=(12,9))
+            fig, axes = plt.subplots(nrow, ncol,figsize=figsize)
         for i,s in enumerate(self.specs):
             spec = self.ps[s]
             ax = axes[i//ncol,i%ncol]
@@ -219,7 +219,7 @@ class PS:
                 spec_name = r'$\ell(\ell+1)%s^{\rm %s}/2\pi$' % (name, s)
             else:
                 spec_name = r'$%s^{\rm %s}$' % (name, s)
-            if np.any(self.ps[s] < 0):
+            if show_abs:
                 spec = np.abs(spec)
             if prefactor and not self.prefactor:
                 spec = spec*ell*(ell+1)/2/np.pi
@@ -245,10 +245,10 @@ class PS:
             if len(ylim) == 2:
                 ax.set_ylim(ylim)
             if legend and not legend_below:
-                ax.legend()
-        plt.tight_layout()
+                ax.legend(loc=loc)
+        if tight: plt.tight_layout()
         if legend and legend_below:
-            ax.legend(ncol=4, bbox_to_anchor=(0.6, -0.2), frameon=False)
+            ax.legend(ncol=4, bbox_to_anchor=anchor, frameon=False)
         if filename:
             plt.savefig(filename, bbox_inches='tight')
         return axes
@@ -385,8 +385,10 @@ class Covmat:
 
     @classmethod
     def from_file(cls, filename):
-        with open(filename, "r") as f:
-            return pickle.load(f)
+        with open(filename, "rb") as f:
+            try: return pickle.load(f)
+            except UnicodeDecodeError:
+                return pickle.load(f, encoding='latin1')
 
 
 def _check_ps(ps):

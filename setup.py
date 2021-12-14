@@ -33,6 +33,12 @@ cython_modules = cythonize([
         name="cosmoslib.utils.lic",
         sources=['cosmoslib/utils/_lic.pyx'],
         include_dirs=[np.get_include()],
+    ),
+    Extension(
+        name="cosmoslib.utils._sphbessel",
+        sources=['cosmoslib/utils/_sphbessel.pyx'],
+        include_dirs=[np.get_include()], libraries=['gsl', 'gslcblas'],
+        # extra_compile_args=['-fopenmp'], extra_link_args=['-fopenmp'],
     )
 ])
 

@@ -1,8 +1,9 @@
 """utility libraries"""
-from cytoolz.functoolz import memoize
+# from cytoolz.functoolz import memoize
+import random, string
 
 
-@memoize
+# @memoize
 def load_context(path=None):
     """Load the context object. Unless otherwise specified, we will search
     in two directory, first we will try to look for a context.ini in the

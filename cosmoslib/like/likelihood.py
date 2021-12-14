@@ -1,8 +1,7 @@
 """various likelihood calculation"""
 import numpy as np
-from cosmoslib.ps import Dl2Cl, resample
-from . import _likelihood as cython
-
+# from cosmoslib.ps import Dl2Cl, resample
+# from cosmoslib.like import _likelihood as cython
 
 class ExactLikelihood:
     def __init__(self, ps_data, noise, f_sky=1., lmin=None, lmax=None):

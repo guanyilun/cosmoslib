@@ -7,11 +7,6 @@ https://github.com/sarojadhikari/fishercode
 
 from matplotlib.patches import Ellipse
 import numpy as np
-
-import matplotlib
-matplotlib.rcParams.update({'text.usetex': True})
-matplotlib.rcParams.update({'axes.formatter.useoffset': False})
-
 import matplotlib.pyplot as plt
 
 

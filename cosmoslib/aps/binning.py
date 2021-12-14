@@ -46,6 +46,21 @@ class Binning():
             idx_end = np.where(self.ells<r)[0][-1]    # last of < bin_r
             self.slices[i] = slice(idx_start, idx_end+1, None)
 
+    def bindata(self, data, axis=-1):
+        """use a given binner to bin data given as numpy array. Axis specifies
+        where the binning will be applied"""
+        if data.shape[axis] != len(self.ells):
+            raise ValueError("Incompatible shape.")
+        # temp function to bin a given 1d array
+        def _bindata(data):
+            w   = self.weights
+            bcl = np.zeros(self.nbins)
+            for i in range(self.nbins):
+                s = self.slices[i]
+                bcl[i] = np.sum(data[s]*w[s])/np.sum(w[s])
+            return bcl
+        return np.apply_along_axis(_bindata, axis, data)
+
     @classmethod
     def for_ps(cls, ps, nbins, scheme='linear', w_func=None):
         return cls(ps.lmin, ps.lmax, nbins, scheme, w_func)
