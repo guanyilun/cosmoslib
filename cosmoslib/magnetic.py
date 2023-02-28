@@ -3,13 +3,13 @@
 """
 import numpy as np
 import scipy.special as sp
-from scipy.special import spherical_jn
+from scipy.special import spherical_jn as jl
 from scipy.interpolate import CubicSpline
 from scipy.integrate import quad, romberg
 from tqdm import tqdm
 from cosmoslib.units import natural as u
 from cosmoslib.utils.glquad import gauss_legendre_quadrature
-from cosmoslib.utils.sphbessel import jl
+# from cosmoslib.utils.sphbessel import jl
 from cosmoslib.utils import integrate
 
 ###############################
