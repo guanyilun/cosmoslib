@@ -19,7 +19,7 @@ with open('HISTORY.rst') as history_file:
 
 requirements = ['numpy', 'scipy', 'matplotlib',
                 'cython', 'cytoolz', 'healpy', 'configparser',
-                'healpy', 'camb']
+                'healpy']
 
 cython_modules = cythonize([
     Extension(
